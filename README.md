@@ -26,8 +26,8 @@ you may find the final command takes a few minutes to complete
 
 Create a new conda environment and activate it, then install the required packages
 ```bash
-mamba create --name cgat-core python=3.10   
-conda activate cgat-core
+mamba create --name crispr-pipeline python=3.10   
+conda activate crispr-pipeline
 mamba install -c conda-forge -c bioconda \
 cgatcore fastqc bowtie multiqc samtools mageck
 ```
