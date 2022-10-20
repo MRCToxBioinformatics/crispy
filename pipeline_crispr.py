@@ -65,7 +65,7 @@ except KeyError:
 
 # define input files. Here we allow single end only
 
-READ1_SEQUENCEFILES = os.path.join(PARAMS["input"], '*_R1_001.fastq.gz') # TSS: Generalise this. Config file?
+READ1_SEQUENCEFILES = os.path.join(PARAMS["input"], PARAMS["basename_regex"])
 
 SEQUENCEFILES_REGEX = regex(r"(.*\/)*(\S+).fastq.gz")
 
@@ -134,9 +134,9 @@ def buildBowtieIndex(infile, outfile):
 
 @mkdir("bowtie.dir")
 @collate(READ1_SEQUENCEFILES,
-         regex('.*\/(\S+)_S\d+_L00[1-4]_R1_001.fastq.gz'), # TSS: Generalise this. Config file?
+         regex(os.path.join(PARAMS["input"], PARAMS["fastq_regex"])),
          add_inputs(buildBowtieIndex),
-         r"bowtie.dir/\1.bowtie.bam")
+         r"bowtie.dir/%s.bowtie.bam" % PARAMS["fastq_pattern"])
 def runBowtie(infiles, outfile):
     '''Map reads to guides with bowtie'''
 

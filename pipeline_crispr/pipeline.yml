@@ -4,6 +4,30 @@ conda_base_env: 'crispr-pipeline'
 # Directory for input files
 input: './input'
 
+# Note the use of _R1_001.fastq.gz to ensure index files (*_I1_001.fastq.gz) are not matched
+basename_regex: '*_R1_001.fastq.gz'
+# Regex and pattern to define which fastqs to use and how to merge then
+# For example, if you have the following fastq filestructure
+#
+# H90_CTR_HIGH_1_S4_L001_R1_001.fastq.gz
+# H90_CTR_HIGH_1_S4_L002_R1_001.fastq.gz
+# H90_CTR_HIGH_1_S4_L003_R1_001.fastq.gz
+# H90_CTR_HIGH_1_S4_L004_R1_001.fastq.gz
+# H90_CTR_LOW_1_S6_L001_R1_001.fastq.gz
+# H90_CTR_LOW_1_S6_L002_R1_001.fastq.gz
+# H90_CTR_LOW_1_S6_L003_R1_001.fastq.gz
+# H90_CTR_LOW_1_S6_L004_R1_001.fastq.gz
+#
+# where the fastq name pattern is
+# [sort_feature]_[condition]_[sort]_[technical_replicate]_[sample_ix]_[Lane]_R1_001.fastq.gz
+# we can define a regex and pattern like so to make sure all the four lanes for search
+# sample are collated together and the output file is prefixed with
+# [sort_feature]_[condition]_[sort]_[technical_replicate]
+#
+fastq_regex: '(\S+)_S\d+_L00[1-4]_R1_001.fastq.gz'
+# just keep the first group
+fastq_pattern: '\1'
+
 # filenames for references
 reference:
 
