@@ -13,20 +13,35 @@ basename_regex: '*_R1_001.fastq.gz'
 # H90_CTR_HIGH_1_S4_L002_R1_001.fastq.gz
 # H90_CTR_HIGH_1_S4_L003_R1_001.fastq.gz
 # H90_CTR_HIGH_1_S4_L004_R1_001.fastq.gz
+# H90_CTR_HIGH_2_S13_L001_R1_001.fastq.gz
+# H90_CTR_HIGH_2_S13_L002_R1_001.fastq.gz
+# H90_CTR_HIGH_2_S13_L003_R1_001.fastq.gz
+# H90_CTR_HIGH_2_S13_L004_R1_001.fastq.gz
 # H90_CTR_LOW_1_S6_L001_R1_001.fastq.gz
 # H90_CTR_LOW_1_S6_L002_R1_001.fastq.gz
 # H90_CTR_LOW_1_S6_L003_R1_001.fastq.gz
 # H90_CTR_LOW_1_S6_L004_R1_001.fastq.gz
+# H90_CTR_LOW_2_S20_L001_R1_001.fastq.gz
+# H90_CTR_LOW_2_S20_L002_R1_001.fastq.gz
+# H90_CTR_LOW_2_S20_L003_R1_001.fastq.gz
+# H90_CTR_LOW_2_S20_L004_R1_001.fastq.gz
+# Undetermined_S0_L001_R1_001.fastq.gz
+# Undetermined_S0_L002_R1_001.fastq.gz
+# Undetermined_S0_L003_R1_001.fastq.gz
+# Undetermined_S0_L004_R1_001.fastq.gz
 #
 # where the fastq name pattern is
 # [sort_feature]_[condition]_[sort]_[technical_replicate]_[sample_ix]_[Lane]_R1_001.fastq.gz
-# we can define a regex and pattern like so to make sure all the four lanes for search
-# sample are collated together and the output file is prefixed with
-# [sort_feature]_[condition]_[sort]_[technical_replicate]
+# we can define a regex and pattern like so to make sure all the 8 lanes for each technical replicate
+# are collated together and the output file is prefixed with
+# [sort_feature]_[condition]_[sort]
 #
-fastq_regex: '(\S+)_S\d+_L00[1-4]_R1_001.fastq.gz'
+# Note the use of (_\d+)*, e.g zero or more
+fastq_regex: '(\S+?)(_\d+)*_S\d+_L00[1-4]_R1_001.fastq.gz'
 # just keep the first group
 fastq_pattern: '\1'
+
+
 
 # filenames for references
 reference:

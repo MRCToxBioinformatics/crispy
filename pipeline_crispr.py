@@ -130,18 +130,16 @@ def buildBowtieIndex(infile, outfile):
 
 ###################################################
 # Alignment
-###################################################
-
+@follows(buildBowtieIndex)
 @mkdir("bowtie.dir")
 @collate(READ1_SEQUENCEFILES,
          regex(os.path.join(PARAMS["input"], PARAMS["fastq_regex"])),
-         add_inputs(buildBowtieIndex),
-         r"bowtie.dir/%s.bowtie.bam" % PARAMS["fastq_pattern"])
-def runBowtie(infiles, outfile):
+         r"bowtie.dir/%s.bowtie.bam" % PARAMS["fastq_pattern"],
+         'reference.dir/guides.1.ebwt') # TSS: hardcoded to expected index name. Alternative, use add_inputs().
+def runBowtie(infiles, outfile, index):
     '''Map reads to guides with bowtie'''
 
-    index = infiles[0][1]
-    infiles = ','.join([x[0] for x in infiles])
+    infiles = ','.join(infiles)
 
     name_base = iotools.snip(index, '.1.ebwt')
 
