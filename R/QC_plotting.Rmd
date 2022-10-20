@@ -1,0 +1,230 @@
+---
+title: "QC plots"
+author: "Tom Smith"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    code_folding: hide
+    toc: true
+  pdf:
+    theme: default
+---
+
+This notebook generates QC plots from the guide RNA (gRNA) counts table ('quant.dir/all_samples.tsv').
+To see the code, click the 'code' buttons, or set 'show all code' using the 'code' drop down in the top-right.
+
+```{r Load libraries, message=FALSE, warning=FALSE}
+library(here)
+
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+
+library(DescTools)
+library(pheatmap)
+library(DESeq2)
+```
+
+```{r Define plot functions}
+# Defining a couple of functions which we will use later in the plotting
+get_my_colours <- function (n) 
+{
+    if ((n > 12 | n < 1)) 
+        stop("n must be >=1 & <=12")
+    cbPalette7 <- c("#2271B2", "#d55e00", "#359B73", "#e69f00", 
+        "#3DB7E9", "#f0e442", "#F748A5")
+    cbPalette12 <- c("#9F0162", "#009F81", "#FF5AAF", "#00FCCF", 
+        "#8400CD", "#008DF9", "#00C2F9", "#FFB2FD", "#A40122", 
+        "#E20134", "#FF6E3A", "#FFC33B")
+    if (n <= 7) {
+        return(cbPalette7[1:n])
+    }
+    else {
+        return(cbPalette12[1:n])
+    }
+}
+  
+my_theme <- function (base_size = 20, base_family = "serif", aspect_square = TRUE, 
+    border = TRUE) 
+{
+    camprot_theme <- theme_bw(base_size = base_size, base_family = base_family) + 
+        theme(panel.grid = element_blank(), panel.background = element_blank())
+    if (aspect_square) {
+        camprot_theme <- camprot_theme + theme(aspect.ratio = 1)
+    }
+    if (!border) {
+        camprot_theme <- camprot_theme + theme(panel.border = element_blank(), 
+            axis.line = element_line(colour = "black", size = 0.5))
+    }
+}
+```
+
+
+```{r Read in input}
+# Read in the input
+gRNA_counts <- read.table(here('quant.dir/all_samples.tsv'), header=TRUE) %>%
+  filter(sgRNA!='*') %>%
+  select(-Undetermined)
+
+gRNA_counts_exp_only <- gRNA_counts %>% 
+  tibble::column_to_rownames('sgRNA') %>% 
+  select(-gene) %>%
+  as.matrix()
+
+
+experimental_design <- read.delim(here('experimental_design.tsv'), row.names=1)
+n_guides <- length(readLines(file(here('guides.csv')), warn=FALSE))
+```
+
+
+## gRNAs per gene
+
+The number of guide RNAs per gene. This includes all detected gRNAs across the samples (e.g > 0 reads in any sample).
+
+```{r Plot gRNA per gene}
+# remove gRNA with zero counts 
+gRNA_counts_noMissing <- gRNA_counts[rowSums(gRNA_counts_exp_only)>0,]
+
+n_gRNA_per_gene_tally <- gRNA_counts_noMissing %>%
+  pull(gene) %>%
+  table() %>%
+  table() %>%
+  data.frame() %>%
+  setNames(c('n_gRNAs', 'genes'))
+
+p <- n_gRNA_per_gene_tally %>%
+  ggplot(aes(n_gRNAs, genes)) +
+  geom_bar(stat='identity') +
+  geom_text(aes(label=genes), hjust=-0.25, angle=90, size=3) +
+  ylim(c(NA, max(n_gRNA_per_gene_tally$genes*1.2))) +
+  my_theme(border=FALSE, base_family='sans', base_size=12) +
+  theme(axis.text.x=element_text(size=8, angle=45, vjust=1, hjust=1)) +
+  xlab('Number of gRNAs') +
+  ylab('Genes')
+
+print(p)
+
+ggsave(here('qc_plot/gRNAs_per_gene.pdf'))
+ggsave(here('qc_plot/gRNAs_per_gene.png'))
+```
+
+
+# gRNA coverage (how many & at what depth) for each sample
+
+Grey-dashed horizontal line is the total number of gRNAs in the pool, inluding those not detected.
+```{r plot guides per sample}
+
+guides_per_sample <- colSums((select(gRNA_counts, -c(gene, sgRNA)))>0) %>%
+  data.frame() %>%
+  setNames('gRNAs') %>%
+  merge(experimental_design, by='row.names') %>%
+  rename('Row.names'='Sample')
+  
+p <- guides_per_sample %>%
+  ggplot(aes(factor(Sample), as.numeric(gRNAs))) +
+  geom_bar(stat='identity') +
+  my_theme(border=FALSE, base_size=15, base_family='sans') +
+  theme(axis.text.x=element_text(angle=45, vjust=1, hjust=1)) +
+  xlab('') +
+  geom_text(aes(label=gRNAs), hjust=-0.25, angle=90, size=3) +
+  ylim(c(NA, max(guides_per_sample$gRNAs*1.15))) +
+  geom_hline(yintercept=n_guides, linetype=2, colour=get_my_colours(1), size=0.25)
+
+ggsave(here('qc_plot/gRNAs_per_sample.pdf'))
+ggsave(here('qc_plot/gRNAs_per_sample.png'))
+
+```
+
+```{r plot read depth per guide}
+p <- gRNA_counts %>%
+  pivot_longer(cols=-c(gene, sgRNA)) %>%
+  merge(experimental_design, by.x='name', by.y='row.names') %>%
+  filter(!is.na(condition)) %>%
+  ggplot(aes(value, group=name, colour=sort, linetype=condition)) +
+  geom_density() +
+  scale_x_log10() +
+  my_theme(border=FALSE, base_size=15, base_family='sans') +
+  xlab('Reads') +
+  ylab('density') +
+  scale_colour_manual(values=get_my_colours(3)) +
+  ggtitle('Reads per gRNA')
+
+ggsave(here('qc_plot/gRNAs_per_sample.pdf'))
+ggsave(here('qc_plot/gRNAs_per_sample.png'))
+
+```
+
+# Was Sequencing depth sufficient/appropriate?
+
+By re-sampling from the counts table at different depths, we can simulate the impact of lower or higher sequencing depth and see how this would affect the number of gRNAs detecting at different reads thresholds. 
+```{r count guides in resampled count tables}
+resampled_quant <- Sys.glob(here('resampled_quant.dir/*all_samples.tsv'))
+
+all_resampled_guides_per_sample <- lapply(resampled_quant, function(infile){
+  depth <- strsplit(basename(infile), '_',)[[1]][[1]]
+  resampled_gRNA_counts <- read.table(infile, header=TRUE) %>%
+  filter(sgRNA!='*') %>%
+  select(-Undetermined)
+  
+  resampled_guides_per_sample <- c(1,10,100) %>% lapply(function(x){
+    colSums((select(resampled_gRNA_counts, -c(gene, sgRNA)))>=x) %>%
+      data.frame() %>%
+      setNames('gRNAs') %>%
+      mutate(reads_threshold=x, depth=depth) %>%
+      tibble::rownames_to_column('sample')
+  }) %>%
+    bind_rows()
+  
+}) %>%
+  bind_rows()
+```
+
+Grey-dashed horizontal line is the total number of gRNAs in the pool, inluding those not detected.
+```{r plot guides counts in resampled count tables}
+p <- all_resampled_guides_per_sample %>%
+  mutate(reads_threshold=sprintf('>%s reads', reads_threshold)) %>%
+  merge(experimental_design, by.x='sample', by.y='row.names') %>%
+  ggplot(aes(as.numeric(depth), gRNAs, group=sample, colour=sort, linetype=condition)) +
+  geom_line() +
+  facet_grid(reads_threshold~.) +
+  my_theme(border=FALSE, base_family='sans', base_size=15) +
+  theme(strip.background=element_blank()) +
+  geom_vline(xintercept=1, linetype=2, colour='grey') +
+  geom_hline(yintercept=n_guides, linetype=2, colour='grey') +
+  xlab('Sequencing depth\n(relative to actual depth)')
+
+print(p)
+
+
+ggsave(here('qc_plot/sequencing_depth.pdf'))
+ggsave(here('qc_plot/sequencing_depth.png'))
+```
+
+```{r plot guides per sample, at 100 read threshold}
+
+p <- all_resampled_guides_per_sample %>%
+  filter(reads_threshold==100, depth=='1.0') %>%
+  ggplot(aes(factor(sample), as.numeric(gRNAs))) +
+  geom_bar(stat='identity') +
+  my_theme(border=FALSE, base_size=15, base_family='sans') +
+  theme(axis.text.x=element_text(angle=45, vjust=1, hjust=1)) +
+  xlab('') +
+  geom_text(aes(label=gRNAs), hjust=-0.25, angle=90, size=3) +
+  ylim(c(NA, max(guides_per_sample$gRNAs*1.15))) +
+  geom_hline(yintercept=n_guides, linetype=2, colour=get_my_colours(1), size=0.25)
+
+print(p)
+
+ggsave(here('qc_plot/gRNAs_per_sample_100reads.pdf'))
+ggsave(here('qc_plot/gRNAs_per_sample_100reads.png'))
+```
+
+# Correlation matrix
+Visualising the correlations between samples can be useful to 
+```{r, fig.height=7, fig.width=7}
+
+mat <- cor(cts)
+pheatmap(mat, cellwidth=10, cellheight=10)
+pheatmap(mat, cellwidth=10, cellheight=10, filename=here('qc_plot/correlations.pdf'))
+pheatmap(mat, cellwidth=10, cellheight=10, filename=here('qc_plot/correlations.png'))
+```
