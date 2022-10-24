@@ -37,17 +37,20 @@ from ruffus import *
 # import useful standard python modules
 import sys
 import os
+
 # import re
 # import shutil
 # import sqlite3
 # import glob
 
+import numpy as np
 import pandas as pd
 # import cgatcore modules
 #import cgatcore.experiment as E
 from cgatcore import pipeline as P
 import cgatcore.iotools as iotools
 
+import ModulePipelineCrispy as Crispy
 
 # load options from the config file
 PARAMS = P.get_parameters(
@@ -197,14 +200,20 @@ def tallyGuides(infile, outfile):
 def mergeTallies(infiles, outfile):
     ''' merge the gRNA counts across all samples'''
     sample_name = iotools.snip(os.path.basename(infiles[0]), '.tsv')
-    all_samples_df = pd.read_csv(infiles[0], sep=',', header=None, names=(sample_name, 'guide')).set_index('guide')
+    all_samples_df = pd.read_csv(infiles[0], sep=',', header=None, names=(sample_name, 'sgRNA')).set_index('sgRNA')
 
     for infile in infiles[1:]:
         sample_name = iotools.snip(os.path.basename(infile), '.tsv')
-        samples_df = pd.read_csv(infile, sep=',', header=None, names=(sample_name, 'guide')).set_index('guide')
-        all_samples_df = all_samples_df.merge(samples_df, on='guide', how='outer')
+        samples_df = pd.read_csv(infile, sep=',', header=None, names=(sample_name, 'sgRNA')).set_index('sgRNA')
+        all_samples_df = all_samples_df.merge(samples_df, on='sgRNA', how='outer')
+
+
+    all_samples_df['gene'] = [x.split('_')[0] for x in all_samples_df.index]
+
+    all_samples_df = all_samples_df.loc[:,['gene'] + [x for x in all_samples_df.columns.tolist() if x != 'gene']]
 
     all_samples_df.fillna(0).to_csv(outfile, sep='\t')
+
 
 ###################################################
 # Report
@@ -228,6 +237,35 @@ def runMultiQC(infiles, outfile):
     P.run(statement,
           job_condaenv=conda_base_env,
           without_cluster=False)
+
+###################################################
+# Re-sampling
+###################################################
+
+@mkdir('resampled_dummy_files')
+@originate(['resampled_dummy_files/%s' % round(x, 3) for x in
+            np.arange(PARAMS['resample_min'], PARAMS['resample_max']+PARAMS['resample_step'], PARAMS['resample_step'])])
+def create_resample_dummies(output_file):
+    with open(output_file, "w"):
+        pass
+
+
+@mkdir('resampled_quant.dir')
+@follows(mergeTallies)
+@transform(create_resample_dummies,
+           regex('resampled_dummy_files/(\S+)'),
+           add_inputs(mergeTallies),
+           r'resampled_quant.dir/\1_all_samples.tsv')
+def resampleTallies(infiles, outfile):
+
+    dummy_infile, infile = infiles
+
+    sample_frac = np.float(os.path.basename(dummy_infile))
+
+    job_options = PARAMS['cluster_options'] + " -t 0:20:00"
+    job_condaenv=PARAMS['conda_base_env']
+
+    Crispy.resampleTallies(infile, sample_frac, outfile, submit=True, job_options=job_options)
 
 
 ###################################################

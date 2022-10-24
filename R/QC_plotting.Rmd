@@ -72,8 +72,29 @@ gRNA_counts_exp_only <- gRNA_counts %>%
   as.matrix()
 
 
-experimental_design <- read.delim(here('experimental_design.tsv'), row.names=1)
+
+experimental_design <- read.delim(here('experimental_design.tsv'), sep='\t', row.names=1)
+
+
 n_guides <- length(readLines(file(here('guides.csv')), warn=FALSE))
+```
+
+# Gini coefficient
+
+The [Gini coefficient](https://en.wikipedia.org/wiki/Gini_coefficient) is a useful summary of how equal the distribution of gRNA counts are, where 0 = perfect equality and 1 = perfect inequality.
+
+For a CRISPR screen, we expect unsorted and plasmid library samples to have the smallest Gini coefficients.
+
+```{r}
+gRNA_counts_exp_only %>% apply(MARGIN=2, Gini) %>% data.frame() %>%
+  tibble::rownames_to_column('sample') %>%
+  dplyr::rename('gini'='.') %>%
+  ggplot(aes(sample, gini)) +
+  geom_bar(stat='identity') +
+  my_theme(base_size=10, border=FALSE) +
+  theme(axis.text.x=element_text(angle=45, vjust=1, hjust=1)) +
+  xlab('')+
+  ylab('Gini coefficient')  
 ```
 
 
@@ -149,6 +170,8 @@ p <- gRNA_counts %>%
   scale_colour_manual(values=get_my_colours(3)) +
   ggtitle('Reads per gRNA')
 
+print(p)
+
 ggsave(here('qc_plot/gRNAs_per_sample.pdf'))
 ggsave(here('qc_plot/gRNAs_per_sample.png'))
 
@@ -166,11 +189,11 @@ all_resampled_guides_per_sample <- lapply(resampled_quant, function(infile){
   filter(sgRNA!='*') %>%
   select(-Undetermined)
   
-  resampled_guides_per_sample <- c(1,10,100) %>% lapply(function(x){
-    colSums((select(resampled_gRNA_counts, -c(gene, sgRNA)))>=x) %>%
+  resampled_guides_per_sample <- c(1,10,100) %>% lapply(function(threshold){
+    colSums((select(resampled_gRNA_counts, -c(gene, sgRNA)))>=threshold) %>%
       data.frame() %>%
       setNames('gRNAs') %>%
-      mutate(reads_threshold=x, depth=depth) %>%
+      mutate(reads_threshold=threshold, depth=depth) %>%
       tibble::rownames_to_column('sample')
   }) %>%
     bind_rows()
@@ -179,14 +202,14 @@ all_resampled_guides_per_sample <- lapply(resampled_quant, function(infile){
   bind_rows()
 ```
 
-Grey-dashed horizontal line is the total number of gRNAs in the pool, inluding those not detected.
+Grey-dashed horizontal line is the total number of gRNAs in the pool, including those not detected.
 ```{r plot guides counts in resampled count tables}
 p <- all_resampled_guides_per_sample %>%
   mutate(reads_threshold=sprintf('>%s reads', reads_threshold)) %>%
   merge(experimental_design, by.x='sample', by.y='row.names') %>%
   ggplot(aes(as.numeric(depth), gRNAs, group=sample, colour=sort, linetype=condition)) +
   geom_line() +
-  facet_grid(reads_threshold~.) +
+  facet_grid(reads_threshold~sort_by) +
   my_theme(border=FALSE, base_family='sans', base_size=15) +
   theme(strip.background=element_blank()) +
   geom_vline(xintercept=1, linetype=2, colour='grey') +
@@ -200,31 +223,48 @@ ggsave(here('qc_plot/sequencing_depth.pdf'))
 ggsave(here('qc_plot/sequencing_depth.png'))
 ```
 
-```{r plot guides per sample, at 100 read threshold}
 
-p <- all_resampled_guides_per_sample %>%
-  filter(reads_threshold==100, depth=='1.0') %>%
-  ggplot(aes(factor(sample), as.numeric(gRNAs))) +
-  geom_bar(stat='identity') +
-  my_theme(border=FALSE, base_size=15, base_family='sans') +
-  theme(axis.text.x=element_text(angle=45, vjust=1, hjust=1)) +
-  xlab('') +
-  geom_text(aes(label=gRNAs), hjust=-0.25, angle=90, size=3) +
-  ylim(c(NA, max(guides_per_sample$gRNAs*1.15))) +
-  geom_hline(yintercept=n_guides, linetype=2, colour=get_my_colours(1), size=0.25)
+```{r}
+cts <- gRNA_counts_exp_only[rowSums(gRNA_counts_exp_only)>0,]
 
-print(p)
-
-ggsave(here('qc_plot/gRNAs_per_sample_100reads.pdf'))
-ggsave(here('qc_plot/gRNAs_per_sample_100reads.png'))
 ```
 
 # Correlation matrix
-Visualising the correlations between samples can be useful to 
-```{r, fig.height=7, fig.width=7}
+
+Visualising the correlations between samples can be useful to identify outlier samples and, where there are replicate experiments, check that they have simiar guide RNA counts.
+
+```{r plot correlation matrix, fig.height=7, fig.width=7}
 
 mat <- cor(cts)
 pheatmap(mat, cellwidth=10, cellheight=10)
 pheatmap(mat, cellwidth=10, cellheight=10, filename=here('qc_plot/correlations.pdf'))
 pheatmap(mat, cellwidth=10, cellheight=10, filename=here('qc_plot/correlations.png'))
 ```
+# PCA
+
+Principle Component Analysis is useful to identify the major sources of variance. We expect the major sources of variance to align with experimental conditions. 
+
+```{r plot PCA projections}
+
+experimental_design_complete <- experimental_design[experimental_design$sort!='Unsorted',]
+
+dds <- DESeqDataSetFromMatrix(countData = cts[,rownames(experimental_design_complete)],
+                              colData = experimental_design_complete,
+                              design = as.formula(sprintf('~ %s', paste(colnames(experimental_design_complete), collapse='+'))))
+
+vst <- vst(dds, blind=FALSE)
+
+p <- DESeq2::plotPCA(vst, intgroup=c("condition", 'replicate', 'sort'), ntop=nrow(vst)) +
+  my_theme(border=FALSE, base_family='sans') +
+  aes(fill=condition, shape=sort, colour=condition) +
+  geom_point(colour='grey30', size=3) +
+  scale_fill_manual(values=get_my_colours(2)) +
+  scale_shape_manual(values=21:25) +
+  scale_colour_discrete(guide="none") +
+  guides(fill = guide_legend(override.aes = list(pch=21) ) )
+
+print(p)
+```
+
+
+

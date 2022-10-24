@@ -53,3 +53,9 @@ bowtie:
   threads: 1
 
   options: '-v2 -l6 -m1'
+
+
+resample:
+  min: 0.05
+  max: 3
+  step: 0.05
