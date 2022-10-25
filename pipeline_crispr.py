@@ -337,7 +337,63 @@ def runCrispyQC(outfile):
 
     P.run(statement)
 
-# Add task to run QC notebook
+
+###################################################
+# statistical tests
+###################################################
+if PARAMS['mageck_method'].lower() == 'rra':
+    @mkdir('mageck.dir')
+    @transform('design_*.csv',
+               regex('design_(\S+).csv'),
+               add_inputs(mergeTallies),
+               r'mageck.dir/\1/\1.gene_summary.txt')
+    def runMAGeCK(infiles, outfile):
+        ''' run MAGeCK RRA to identify enriched/depleted '''
+
+        design_inf, counts = infiles
+        counts = os.path.abspath(counts)
+
+        outfile_base = P.snip(os.path.basename(outfile), '.gene_summary.txt')
+
+        design = pd.read_table(design_inf, sep=',')
+
+        if not design.columns.tolist() == ['sample', 'condition']:
+            raise ValueError(
+                '''Unexpected design table format for file %(design_inf)s
+                Table should only have sample and condition columns''')
+
+        control_condition = design.condition[0]
+        treatment_condition = [x for x in design.condition if x != control_condition][0]
+        control_samples = design[design.condition==control_condition]['sample'].tolist()
+        treatment_samples = design[design.condition==treatment_condition]['sample'].tolist()
+
+        control_samples = ','.join(control_samples)
+        treatment_samples = ','.join(treatment_samples)
+
+        statement = '''
+        cd mageck.dir/%(outfile_base)s;
+        mageck test
+        -k %(counts)s
+        -c %(control_samples)s
+        -t %(treatment_samples)s
+        -n %(outfile_base)s
+        ''' % locals()
+
+        P.run(statement)
+
+else:
+    @mkdir('mageck.dir')
+    @transform('design_*.tsv',
+               regex('design_(\S+).tsv'),
+               add_inputs(mergeTallies),
+               r'mageck.dir/\1.gene_summary.txt')
+    def runMAGeCK(infiles, outfile):
+        ''' run MAGeCK MLE to identify enriched/depleted '''
+
+        # Need to create this function!
+        pass
+
+
 
 ###################################################
 # targets

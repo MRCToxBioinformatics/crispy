@@ -15,15 +15,16 @@ CGAT-core is built upon the `ruffus` package. To learn more about ruffus, includ
 
 ### Installation
 
-The instructions below will work for unix-like operating systems (linux or macOS). It may be possible to install and run the pipeline in windows, but I would strongly advise against trying, given that the optimal place to run the pipeline is on a HPC, not your personal computer.
+The instructions below will work for unix-like operating systems (linux or macOS). It may be possible to install and run the pipeline in windows, but I would strongly advise against trying, especially given that the optimal place to run the pipeline is on a HPC, not your personal computer.
 
 The same installation instructions apply to run the pipeline locally and on the HPC.
-We're using mamba below. See https://cgat-core.readthedocs.io/en/latest/getting_started/Installation.html
+
+See https://cgat-core.readthedocs.io/en/latest/getting_started/Installation.html
 for further CGAT-core installation options if needed.
 
 See https://github.com/mamba-org/mamba for instructions on how to install mamba.
-Can alternatively only use conda, but mamba is quicker for installation. Even with mamba,
-you may find the final command takes a few minutes to complete
+Can alternatively only use conda to install the requirements, but mamba is quicker. Even with mamba,
+you may find the installation takes 10 minutes to complete
 
 Create a new conda environment and activate it, then install the required packages
 ```bash
@@ -43,7 +44,20 @@ python <PATH TO THIS REPOSITORY/pipelines/pipeline_crispr.py> config
 
 Now, create a subdirectory called `input` and add the fastq files. Better still, add softlinks to the fastqs, so the raw data can remain elsewhere on your filesystem, isolated from the pipeline files.
 
-The only other input file the pipeline needs is a comma separated file with two columns, gRNA name and sequence. Examples of these files can be found in [guides](https://github.com/MRCToxBioinformatics/crispy/tree/main/guides). By default, the pipeline expects the filepath to be `guides.csv`. To specify another filepath, edit `pipeline.yml`.
+The pipeline also needs a comma separated file with two columns, gRNA name and sequence. Examples of these files can be found in [guides](https://github.com/MRCToxBioinformatics/crispy/tree/main/guides). By default, the pipeline expects the filepath to be `guides.csv`. To specify another filepath, edit `pipeline.yml`.
+
+Finally, we need to provide a design file(s) which link the samples to the experimental conditions for the statistical test.
+A basic example is shown below. This file should have two columns, sample and condition. The first condition is taken to be the reference, or control condition
+
+sample,condition
+H90_HS_LOW,low
+H90_HS_HIGH,high
+
+Note that the samples should match the sample names as they are derived from the fastqs using the fastq_regex and fastq_pattern configuration parameters. See `pipeline.yml` for an example how the regex and pattern map from fastq filepaths to sample names.
+
+Statistical testing is performed for each design file and these *must* be named _design_xxx.csv_, where _xxx_ names the testing results.
+
+By default, the pipeline will use the MAGeCK RRA algorithm. To use MAGeCK MLE, edit the `pipeline.yml` file (not yet supported)
 
 You can now run the pipeline with:
 

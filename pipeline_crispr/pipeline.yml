@@ -32,9 +32,13 @@ basename_regex: '*_R1_001.fastq.gz'
 #
 # where the fastq name pattern is
 # [sort_feature]_[condition]_[sort]_[technical_replicate]_[sample_ix]_[Lane]_R1_001.fastq.gz
-# we can define a regex and pattern like so to make sure all the 8 lanes for each technical replicate
-# are collated together and the output file is prefixed with
-# [sort_feature]_[condition]_[sort]
+# we can define a regex and pattern as shown with the default values to make sure
+# all the 8 lanes for each technical replicate are collated together and the output
+# file is prefixed with
+# [sort_feature]_[condition]_[sort], e.g
+# H90_CTR_HIGH
+# H90_CTR_LOW
+# Undetermined
 #
 # Note the use of (_\d+)*, e.g zero or more
 fastq_regex: '(\S+?)(_\d+)*_S\d+_L00[1-4]_R1_001.fastq.gz'
@@ -59,3 +63,7 @@ resample:
   min: 0.05
   max: 3
   step: 0.05
+
+mageck:
+  # rra or mle
+  method: 'rra'
