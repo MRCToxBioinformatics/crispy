@@ -322,22 +322,18 @@ def resampleTallies(infiles, outfile):
 ###################################################
 @mkdir('qc_plots.dir')
 @follows(mergeErrorCounts, mergeTallies, resampleTallies)
-@originate('x')
+@originate('qc_plots.dir/QC_plotting.html')
 def runCrispyQC(outfile):
 
     this_filename = inspect.getframeinfo(inspect.currentframe()).filename
     this_dir     = os.path.dirname(os.path.abspath(this_filename))
-    print(this_dir)
-    print(notebook_path)
 
     notebook_path = os.path.join(this_dir, 'R', 'QC_plotting.Rmd')
 
-    return
-
     statement = '''
-    cp %(notebook path)s . ;
+    cp %(notebook_path)s . ;
     Rscript -e "rmarkdown::render('QC_plotting.Rmd')"
-    '''
+    ''' % locals()
 
     P.run(statement)
 
