@@ -81,15 +81,9 @@ experimental_design <- read.delim(here('experimental_design.tsv'), sep='\t', row
 n_guides <- length(readLines(file(here('guides.csv')), warn=FALSE))
 ```
 
-```{r}
-error_counts <- read.table('~/projects/09_CRIPSR_screen_Dimitris/pipeline_runs/test_tech_rep_sep/bowtie.dir/all_errors.tsv', sep='\t', header=TRUE)
-error_counts$errors[is.na(error_counts$errors)] <- 'Unmapped'
-
-experimental_design <- read.delim(here('~/projects/09_CRIPSR_screen_Dimitris/pipeline_runs/test_tech_rep_sep/experimental_design.tsv'), sep='\t', row.names=1)
-```
 
 # Errors
-```{r plot error tallies}
+```{r plot error tallies, message=FALSE}
 max_errors <- setdiff(error_counts$errors, 'Unmapped') %>% as.numeric() %>% max()
 
 to_plot <- error_counts %>% pivot_longer(cols=-errors, names_to='sample', values_to='n') %>%
@@ -123,8 +117,8 @@ The [Gini coefficient](https://en.wikipedia.org/wiki/Gini_coefficient) is a usef
 
 For a CRISPR screen, we expect unsorted and plasmid library samples to have the smallest Gini coefficients.
 
-```{r plot Gini coefficient}
-gRNA_counts_exp_only %>% apply(MARGIN=2, Gini) %>% data.frame() %>%
+```{r plot Gini coefficient, message=FALSE}
+p <- gRNA_counts_exp_only %>% apply(MARGIN=2, Gini) %>% data.frame() %>%
   tibble::rownames_to_column('sample') %>%
   dplyr::rename('gini'='.') %>%
   ggplot(aes(sample, gini)) +
@@ -133,14 +127,19 @@ gRNA_counts_exp_only %>% apply(MARGIN=2, Gini) %>% data.frame() %>%
   theme(axis.text.x=element_text(angle=45, vjust=1, hjust=1)) +
   xlab('')+
   ylab('Gini coefficient')  
+
+print(p)
+
+ggsave(here('qc_plots.dir/gini_coefficients.pdf'))
+ggsave(here('qc_plots.dir/gini_coefficients.png'))
 ```
 
 
-## gRNAs per gene
+# gRNAs per gene
 
 The number of guide RNAs per gene. This includes all detected gRNAs across the samples (e.g > 0 reads in any sample).
 
-```{r Plot gRNA per gene}
+```{r Plot gRNA per gene, message=FALSE}
 # remove gRNA with zero counts 
 gRNA_counts_noMissing <- gRNA_counts[rowSums(gRNA_counts_exp_only)>0,]
 
@@ -171,7 +170,7 @@ ggsave(here('qc_plots.dir/gRNAs_per_gene.png'))
 # gRNA coverage (how many & at what depth) for each sample
 
 Grey-dashed horizontal line is the total number of gRNAs in the pool, inluding those not detected.
-```{r plot guides per sample}
+```{r plot guides per sample, message=FALSE}
 
 guides_per_sample <- colSums((select(gRNA_counts, -c(gene, sgRNA)))>0) %>%
   data.frame() %>%
@@ -195,7 +194,7 @@ ggsave(here('qc_plots.dir/gRNAs_per_sample.png'))
 
 ```
 
-```{r plot read depth per guide}
+```{r plot read depth per guide, message=FALSE}
 p <- gRNA_counts %>%
   pivot_longer(cols=-c(gene, sgRNA)) %>%
   merge(experimental_design, by.x='name', by.y='row.names') %>%
@@ -219,7 +218,7 @@ ggsave(here('qc_plots.dir/gRNAs_per_sample.png'))
 # Was Sequencing depth sufficient/appropriate?
 
 By re-sampling from the counts table at different depths, we can simulate the impact of lower or higher sequencing depth and see how this would affect the number of gRNAs detecting at different reads thresholds. 
-```{r count guides in resampled count tables}
+```{r count guides in resampled count tables, message=FALSE}
 resampled_quant <- Sys.glob(here('resampled_quant.dir/*all_samples.tsv'))
 
 all_resampled_guides_per_sample <- lapply(resampled_quant, function(infile){
@@ -242,7 +241,7 @@ all_resampled_guides_per_sample <- lapply(resampled_quant, function(infile){
 ```
 
 Grey-dashed horizontal line is the total number of gRNAs in the pool, including those not detected.
-```{r plot guides counts in resampled count tables}
+```{r plot guides counts in resampled count tables, message=FALSE}
 p <- all_resampled_guides_per_sample %>%
   mutate(reads_threshold=sprintf('>%s reads', reads_threshold)) %>%
   merge(experimental_design, by.x='sample', by.y='row.names') %>%
@@ -272,7 +271,7 @@ cts <- gRNA_counts_exp_only[rowSums(gRNA_counts_exp_only)>0,]
 
 Visualising the correlations between samples can be useful to identify outlier samples and, where there are replicate experiments, check that they have simiar guide RNA counts.
 
-```{r plot correlation matrix, fig.height=7, fig.width=7}
+```{r plot correlation matrix, fig.height=7, fig.width=7, message=FALSE}
 
 mat <- cor(cts)
 pheatmap(mat, cellwidth=10, cellheight=10)
@@ -283,7 +282,7 @@ pheatmap(mat, cellwidth=10, cellheight=10, filename=here('qc_plots.dir/correlati
 
 Principle Component Analysis is useful to identify the major sources of variance. We expect the major sources of variance to align with experimental conditions. 
 
-```{r plot PCA projections}
+```{r plot PCA projections, message=FALSE}
 
 experimental_design_complete <- experimental_design[experimental_design$sort!='Unsorted',]
 
