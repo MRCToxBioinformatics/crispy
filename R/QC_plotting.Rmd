@@ -71,6 +71,8 @@ gRNA_counts_exp_only <- gRNA_counts %>%
   select(-gene) %>%
   as.matrix()
 
+error_counts <- read.table(here('bowtie.dir/all_errors.tsv'), sep='\t', header=TRUE)
+error_counts$errors[is.na(error_counts$errors)] <- 'Unmapped'
 
 
 experimental_design <- read.delim(here('experimental_design.tsv'), sep='\t', row.names=1)
@@ -79,13 +81,49 @@ experimental_design <- read.delim(here('experimental_design.tsv'), sep='\t', row
 n_guides <- length(readLines(file(here('guides.csv')), warn=FALSE))
 ```
 
+```{r}
+error_counts <- read.table('~/projects/09_CRIPSR_screen_Dimitris/pipeline_runs/test_tech_rep_sep/bowtie.dir/all_errors.tsv', sep='\t', header=TRUE)
+error_counts$errors[is.na(error_counts$errors)] <- 'Unmapped'
+
+experimental_design <- read.delim(here('~/projects/09_CRIPSR_screen_Dimitris/pipeline_runs/test_tech_rep_sep/experimental_design.tsv'), sep='\t', row.names=1)
+```
+
+# Errors
+```{r plot error tallies}
+max_errors <- setdiff(error_counts$errors, 'Unmapped') %>% as.numeric() %>% max()
+
+to_plot <- error_counts %>% pivot_longer(cols=-errors, names_to='sample', values_to='n') %>%
+  merge(experimental_design, by.x='sample', by.y='row.names') %>%
+  mutate(errors=factor(errors, levels=c(0:max_errors, 'Unmapped'))) %>%
+  group_by(sample) %>%
+  mutate(perc=100*n/sum(n))
+
+p <- to_plot %>%
+  ggplot(aes(sample, perc, fill=errors)) +
+  geom_bar(stat='identity', position='stack') +
+  scale_fill_manual(values=c(get_my_colours(max_errors+1), 'grey'), name='Errors') +
+  geom_text(data=(filter(to_plot, errors %in% c('0', 'Unmapped'))), aes(label=round(perc)), position=position_stack(vjust = .5)) +
+  xlab('') +
+  ylab('Percentage of reads') +
+  ggtitle('Number of errors in reads\nrelative to guide RNA sequences') +
+  my_theme(border=FALSE, base_family='sans', base_size=8) +
+  theme(axis.text.x=element_text(angle=45, vjust=1, hjust=1))
+  
+print(p)
+
+ggsave(here('qc_plots.dir/error_tallies.pdf'))
+ggsave(here('qc_plots.dir/error_tallies.png'))  
+
+```
+
+
 # Gini coefficient
 
 The [Gini coefficient](https://en.wikipedia.org/wiki/Gini_coefficient) is a useful summary of how equal the distribution of gRNA counts are, where 0 = perfect equality and 1 = perfect inequality.
 
 For a CRISPR screen, we expect unsorted and plasmid library samples to have the smallest Gini coefficients.
 
-```{r}
+```{r plot Gini coefficient}
 gRNA_counts_exp_only %>% apply(MARGIN=2, Gini) %>% data.frame() %>%
   tibble::rownames_to_column('sample') %>%
   dplyr::rename('gini'='.') %>%
@@ -125,8 +163,8 @@ p <- n_gRNA_per_gene_tally %>%
 
 print(p)
 
-ggsave(here('qc_plot/gRNAs_per_gene.pdf'))
-ggsave(here('qc_plot/gRNAs_per_gene.png'))
+ggsave(here('qc_plots.dir/gRNAs_per_gene.pdf'))
+ggsave(here('qc_plots.dir/gRNAs_per_gene.png'))
 ```
 
 
@@ -149,10 +187,11 @@ p <- guides_per_sample %>%
   xlab('') +
   geom_text(aes(label=gRNAs), hjust=-0.25, angle=90, size=3) +
   ylim(c(NA, max(guides_per_sample$gRNAs*1.15))) +
-  geom_hline(yintercept=n_guides, linetype=2, colour=get_my_colours(1), size=0.25)
+  geom_hline(yintercept=n_guides, linetype=2, colour=get_my_colours(1), size=0.25) +
+  ylab('Guides') 
 
-ggsave(here('qc_plot/gRNAs_per_sample.pdf'))
-ggsave(here('qc_plot/gRNAs_per_sample.png'))
+ggsave(here('qc_plots.dir/gRNAs_per_sample.pdf'))
+ggsave(here('qc_plots.dir/gRNAs_per_sample.png'))
 
 ```
 
@@ -172,8 +211,8 @@ p <- gRNA_counts %>%
 
 print(p)
 
-ggsave(here('qc_plot/gRNAs_per_sample.pdf'))
-ggsave(here('qc_plot/gRNAs_per_sample.png'))
+ggsave(here('qc_plots.dir/gRNAs_per_sample.pdf'))
+ggsave(here('qc_plots.dir/gRNAs_per_sample.png'))
 
 ```
 
@@ -219,8 +258,8 @@ p <- all_resampled_guides_per_sample %>%
 print(p)
 
 
-ggsave(here('qc_plot/sequencing_depth.pdf'))
-ggsave(here('qc_plot/sequencing_depth.png'))
+ggsave(here('qc_plots.dir/sequencing_depth.pdf'))
+ggsave(here('qc_plots.dir/sequencing_depth.png'))
 ```
 
 
@@ -237,8 +276,8 @@ Visualising the correlations between samples can be useful to identify outlier s
 
 mat <- cor(cts)
 pheatmap(mat, cellwidth=10, cellheight=10)
-pheatmap(mat, cellwidth=10, cellheight=10, filename=here('qc_plot/correlations.pdf'))
-pheatmap(mat, cellwidth=10, cellheight=10, filename=here('qc_plot/correlations.png'))
+pheatmap(mat, cellwidth=10, cellheight=10, filename=here('qc_plots.dir/correlations.pdf'))
+pheatmap(mat, cellwidth=10, cellheight=10, filename=here('qc_plots.dir/correlations.png'))
 ```
 # PCA
 

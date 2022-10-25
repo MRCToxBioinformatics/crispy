@@ -37,6 +37,8 @@ from ruffus import *
 # import useful standard python modules
 import sys
 import os
+import inspect
+
 
 # import re
 # import shutil
@@ -133,6 +135,8 @@ def buildBowtieIndex(infile, outfile):
 
 ###################################################
 # Alignment
+###################################################
+
 @follows(buildBowtieIndex)
 @mkdir("bowtie.dir")
 @collate(READ1_SEQUENCEFILES,
@@ -177,6 +181,47 @@ def runBowtie(infiles, outfile, index):
 # Alignment QC
 ###################################################
 
+@transform(runBowtie,
+           suffix('.bam'),
+           '.bam.errors')
+def countErrors(infile, outfile):
+    ''' Count the number of error in the sequence reads
+    relative to the expected guide sequences '''
+
+    statement = '''
+    samtools view  %(infile)s |
+    cut -f14|
+    sort |
+    uniq -c|
+    sed -e 's/^ *//g'  -e 's/[:| ]/\\t/'g |
+    cut -f1,4 >
+    %(outfile)s
+    ''' % locals()
+
+    P.run(statement)
+
+@merge(countErrors,
+       'bowtie.dir/all_errors.tsv')
+def mergeErrorCounts(infiles, outfile):
+    ''' merge the error counts across all samples'''
+    sample_name = iotools.snip(os.path.basename(infiles[0]), '.bowtie.bam.errors')
+    all_samples_df = pd.read_csv(infiles[0], sep='\t', header=None,
+                                 names=(sample_name, 'errors')).set_index('errors')
+
+    for infile in infiles[1:]:
+        print(infile)
+        print(all_samples_df)
+        sample_name = iotools.snip(os.path.basename(infile), '.bowtie.bam.errors')
+        samples_df = pd.read_csv(infile, sep='\t', header=None,
+                                     names=(sample_name, 'errors')).set_index('errors')
+
+        all_samples_df = all_samples_df.merge(samples_df, on='errors', how='outer')
+
+
+    all_samples_df.fillna(0).to_csv(outfile, sep='\t')
+
+
+
 ###################################################
 # Count guides
 ###################################################
@@ -200,17 +245,20 @@ def tallyGuides(infile, outfile):
 def mergeTallies(infiles, outfile):
     ''' merge the gRNA counts across all samples'''
     sample_name = iotools.snip(os.path.basename(infiles[0]), '.tsv')
-    all_samples_df = pd.read_csv(infiles[0], sep=',', header=None, names=(sample_name, 'sgRNA')).set_index('sgRNA')
+    all_samples_df = pd.read_csv(infiles[0], sep=',', header=None,
+                                 names=(sample_name, 'sgRNA')).set_index('sgRNA')
 
     for infile in infiles[1:]:
         sample_name = iotools.snip(os.path.basename(infile), '.tsv')
-        samples_df = pd.read_csv(infile, sep=',', header=None, names=(sample_name, 'sgRNA')).set_index('sgRNA')
+        samples_df = pd.read_csv(infile, sep=',', header=None,
+                                 names=(sample_name, 'sgRNA')).set_index('sgRNA')
         all_samples_df = all_samples_df.merge(samples_df, on='sgRNA', how='outer')
 
 
     all_samples_df['gene'] = [x.split('_')[0] for x in all_samples_df.index]
 
-    all_samples_df = all_samples_df.loc[:,['gene'] + [x for x in all_samples_df.columns.tolist() if x != 'gene']]
+    all_samples_df = all_samples_df.loc[
+        :,['gene'] + [x for x in all_samples_df.columns.tolist() if x != 'gene']]
 
     all_samples_df.fillna(0).to_csv(outfile, sep='\t')
 
@@ -246,6 +294,8 @@ def runMultiQC(infiles, outfile):
 @originate(['resampled_dummy_files/%s' % round(x, 3) for x in
             np.arange(PARAMS['resample_min'], PARAMS['resample_max']+PARAMS['resample_step'], PARAMS['resample_step'])])
 def create_resample_dummies(output_file):
+    '''make empty files names for each level of
+    resampling to use to define downstream task'''
     with open(output_file, "w"):
         pass
 
@@ -257,7 +307,7 @@ def create_resample_dummies(output_file):
            add_inputs(mergeTallies),
            r'resampled_quant.dir/\1_all_samples.tsv')
 def resampleTallies(infiles, outfile):
-
+    ''' Resample the counts table to simulate different sequencing depths '''
     dummy_infile, infile = infiles
 
     sample_frac = np.float(os.path.basename(dummy_infile))
@@ -267,6 +317,31 @@ def resampleTallies(infiles, outfile):
 
     Crispy.resampleTallies(infile, sample_frac, outfile, submit=True, job_options=job_options)
 
+###################################################
+# QC
+###################################################
+@mkdir('qc_plots.dir')
+@follows(mergeErrorCounts, mergeTallies, resampleTallies)
+@originate('x')
+def runCrispyQC(outfile):
+
+    this_filename = inspect.getframeinfo(inspect.currentframe()).filename
+    this_dir     = os.path.dirname(os.path.abspath(this_filename))
+    print(this_dir)
+    print(notebook_path)
+
+    notebook_path = os.path.join(this_dir, 'R', 'QC_plotting.Rmd')
+
+    return
+
+    statement = '''
+    cp %(notebook path)s . ;
+    Rscript -e "rmarkdown::render('QC_plotting.Rmd')"
+    '''
+
+    P.run(statement)
+
+# Add task to run QC notebook
 
 ###################################################
 # targets
@@ -274,12 +349,20 @@ def resampleTallies(infiles, outfile):
 
 
 
-# full = run it all!
+# full_quant = run everything except the QC notebook
 @follows(runMultiQC,
-         runBowtie)
-def full():
+         mergeErrorCounts,
+         mergeTallies,
+         resampleTallies)
+def full_quant():
     pass
 
+
+# full = run it all!
+@follows(full_quant,
+         runCrispyQC)
+def full():
+    pass
 
 ###################################################
 # Making pipline command-line friendly
