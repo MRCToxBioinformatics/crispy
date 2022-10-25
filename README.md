@@ -49,9 +49,11 @@ The pipeline also needs a comma separated file with two columns, gRNA name and s
 Finally, we need to provide a design file(s) which link the samples to the experimental conditions for the statistical test.
 A basic example is shown below. This file should have two columns, sample and condition. The first condition is taken to be the reference, or control condition
 
+```
 sample,condition
 H90_HS_LOW,low
 H90_HS_HIGH,high
+```
 
 Note that the samples should match the sample names as they are derived from the fastqs using the fastq_regex and fastq_pattern configuration parameters. See `pipeline.yml` for an example how the regex and pattern map from fastq filepaths to sample names.
 
