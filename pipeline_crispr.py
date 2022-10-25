@@ -402,16 +402,14 @@ else:
 
 
 # full_quant = run everything except the QC notebook
-@follows(runMultiQC,
-         mergeErrorCounts,
-         mergeTallies,
-         resampleTallies)
+@follows(mergeErrorCounts,
+         mergeTallies)
 def full_quant():
     pass
 
 
 # full = run it all!
-@follows(full_quant,
+@follows(runMAGeCK,
          runCrispyQC)
 def full():
     pass
