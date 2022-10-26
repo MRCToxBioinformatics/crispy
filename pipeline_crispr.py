@@ -157,6 +157,7 @@ def runBowtie(infiles, outfile, index):
 
     tmp_file = P.get_temp_filename()
 
+
     statement = '''
     bowtie
     -x %(name_base)s
@@ -173,7 +174,11 @@ def runBowtie(infiles, outfile, index):
     ''' % locals()
 
 
-    job_options = PARAMS['cluster_options'] + ' -t 1:00:00'
+    if PARAMS['cluster_queue_manager'] == "slurm":
+        job_options = PARAMS['cluster_options'] + " -t 3:00:00"
+    else:
+        job_options = PARAMS['cluster_options']
+
     P.run(statement, job_condaenv=conda_base_env)
 
 
@@ -329,6 +334,11 @@ def runCrispyQC(outfile):
     this_dir     = os.path.dirname(os.path.abspath(this_filename))
 
     notebook_path = os.path.join(this_dir, 'R', 'QC_plotting.Rmd')
+
+    if PARAMS['cluster_queue_manager'] == "slurm":
+        job_options = PARAMS['cluster_options'] + " -t 1:00:00"
+    else:
+        job_options = PARAMS['cluster_options']
 
     statement = '''
     cp %(notebook_path)s . ;
