@@ -69,6 +69,7 @@ Provide as a comma separated file with two columns, gRNA name and sequence. Exam
 For the QC plotting, we need to provide a map from samples names to the experimental conditions in a file called `experimental_design.tsv`.
 This needs to include the columns shown in the example below.
 
+```
 sample	condition	sort	sort_by
 H90_CTR_HIGH_1	Control	High	H90
 H90_CTR_LOW_1	Control	Low	H90
@@ -80,6 +81,7 @@ SITA_CTR_LOW_1	Control	Low	SITA
 SITA_HS_HIGH_1	Heat stress	High	SITA
 SITA_HS_LOW_1	Heat stress	Low	SITA
 unsorted_library_1	Control	Unsorted	Unsorted
+```
 
 Note that the samples should match the sample names as they are derived from the fastqs using the fastq_regex and fastq_pattern configuration parameters. See `pipeline.yml` for an example how the regex and pattern map from fastq filepaths to sample names.
 
