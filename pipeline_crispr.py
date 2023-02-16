@@ -238,8 +238,9 @@ def mergeErrorCounts(infiles, outfile):
 def tallyGuides(infile, outfile):
     '''Count reads per gRNA'''
     # bam is sorted, so we can just use uniq -c on the contig column
+    # -F 0x40 to exclude unmapped
     statement = '''
-    samtools view %(infile)s | cut -f3 | uniq -c | sed -e 's/^ *//;s/ /,/' >
+    samtools view %(infile)s -F 0x40 | cut -f3 | uniq -c | sed -e 's/^ *//;s/ /,/' >
     %(outfile)s
     ''' % locals()
 
