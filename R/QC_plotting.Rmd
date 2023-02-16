@@ -63,8 +63,11 @@ my_theme <- function (base_size = 20, base_family = "serif", aspect_square = TRU
 ```{r Read in input}
 # Read in the input
 gRNA_counts <- read.table(here('quant.dir/all_samples.tsv'), header=TRUE) %>%
-  filter(sgRNA!='*') %>%
-  select(-Undetermined)
+  filter(sgRNA!='*')
+
+if('Undetermined' %in% colnames(gRNA_counts)){
+  gRNA_counts <- gRNA_counts %>% select(-Undetermined)
+}
 
 gRNA_counts_exp_only <- gRNA_counts %>% 
   tibble::column_to_rownames('sgRNA') %>% 
@@ -224,8 +227,11 @@ resampled_quant <- Sys.glob(here('resampled_quant.dir/*all_samples.tsv'))
 all_resampled_guides_per_sample <- lapply(resampled_quant, function(infile){
   depth <- strsplit(basename(infile), '_',)[[1]][[1]]
   resampled_gRNA_counts <- read.table(infile, header=TRUE) %>%
-  filter(sgRNA!='*') %>%
-  select(-Undetermined)
+  filter(sgRNA!='*')
+  
+  if('Undetermined' %in% colnames(resampled_gRNA_counts)){
+    resampled_gRNA_counts <- resampled_gRNA_counts %>% select(-Undetermined)
+   }
   
   resampled_guides_per_sample <- c(1,10,100) %>% lapply(function(threshold){
     colSums((select(resampled_gRNA_counts, -c(gene, sgRNA)))>=threshold) %>%
@@ -247,7 +253,7 @@ p <- all_resampled_guides_per_sample %>%
   merge(experimental_design, by.x='sample', by.y='row.names') %>%
   ggplot(aes(as.numeric(depth), gRNAs, group=sample, colour=sort, linetype=condition)) +
   geom_line() +
-  facet_grid(reads_threshold~sort_by) +
+  facet_grid(reads_threshold~.) +
   my_theme(border=FALSE, base_family='sans', base_size=15) +
   theme(strip.background=element_blank()) +
   geom_vline(xintercept=1, linetype=2, colour='grey') +
@@ -292,7 +298,7 @@ dds <- DESeqDataSetFromMatrix(countData = cts[,rownames(experimental_design_comp
 
 vst <- vst(dds, blind=FALSE)
 
-p <- DESeq2::plotPCA(vst, intgroup=c("condition", 'replicate', 'sort'), ntop=nrow(vst)) +
+p <- DESeq2::plotPCA(vst, intgroup=colnames(experimental_design_complete), ntop=nrow(vst)) +
   my_theme(border=FALSE, base_family='sans') +
   aes(fill=condition, shape=sort, colour=condition) +
   geom_point(colour='grey30', size=3) +
@@ -302,6 +308,9 @@ p <- DESeq2::plotPCA(vst, intgroup=c("condition", 'replicate', 'sort'), ntop=nro
   guides(fill = guide_legend(override.aes = list(pch=21) ) )
 
 print(p)
+
+ggsave(here('qc_plots.dir/pca.png'))
+ggsave(here('qc_plots.dir/pca.pdf'))
 ```
 
 
