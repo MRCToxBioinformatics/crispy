@@ -136,4 +136,4 @@ def normaliseCounts(prenorm_table_filepath, norm_table_filepath):
 
     norm_counts_table = norm_counts_table[index_names + count_names]
 
-    norm_counts_table.to_csv(norm_table_filepath, sep='\t')
+    norm_counts_table.to_csv(norm_table_filepath, sep='\t', index=False)
