@@ -1,10 +1,12 @@
 from cgatcore import pipeline as P
 import cgatcore.iotools as iotools
 import os
+import math
 from cgatcore.pipeline import cluster_runnable
 
 import numpy as np
 import pandas as pd
+
 from collections import Counter
 
 @cluster_runnable
@@ -103,20 +105,35 @@ def normaliseCounts(prenorm_table_filepath, norm_table_filepath):
       return medianfactor
 
 
-    counts = pd.read_csv(prenorm_table_filepath, sep='\t')
-
     ctable = {}
-    for colname in counts_table.columns[2:]:
-        ctable[colname] = counts_table[colname]
 
+    inf = open(prenorm_table_filepath, 'r')
+    header = next(inf).strip().split('\t')
+    index_names = header[0:2]
+    count_names = header[2:]
+    for line in inf:
+    
+        line = line.strip().split('\t')
+    
+        sgrna = '---'.join(line[0:2])
+        counts = line[2:]
+    
+        ctable[sgrna] = list(map(int, map(float, counts)))
+
+    
 
     medianfactor = mageckcount_getmediannormfactor(ctable)
 
     samplefactor = medianfactor
+    n=len(ctable[list(ctable.keys())[0]]) # samples
     ntable={ k: [ samplefactor[i]*v[i] for i in range(n)] for (k,v) in ctable.items()}
 
-    norm_counts_table = counts_table.copy()
-    for k,v in ntable.items():
-        norm_counts_table[k] = v
+    norm_counts_table = pd.DataFrame.from_records(ntable).transpose().set_axis(count_names, axis=1).reset_index()
+
+    norm_counts_table[index_names]  = norm_counts_table['index'].str.split("---", expand = True)
+
+    norm_counts_table = norm_counts_table.drop('index', axis=1)
+
+    norm_counts_table = norm_counts_table[index_names + count_names]
 
     norm_counts_table.to_csv(norm_table_filepath, sep='\t')
