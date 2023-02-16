@@ -327,7 +327,7 @@ def resampleTallies(infiles, outfile):
 ###################################################
 @mkdir('qc_plots.dir')
 @follows(mergeErrorCounts, mergeTallies, resampleTallies)
-@originate('qc_plots.dir/QC_plotting.html')
+@originate('QC_plotting.html')
 def runCrispyQC(outfile):
 
     this_filename = inspect.getframeinfo(inspect.currentframe()).filename
@@ -417,6 +417,12 @@ else:
 def full_quant():
     pass
 
+
+# qc = run all qc
+@follows(runMultiQC,
+         runCrispyQC)
+def qc():
+    pass
 
 # full = run it all!
 @follows(runMAGeCK,
