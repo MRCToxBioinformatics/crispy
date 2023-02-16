@@ -10,7 +10,8 @@ output:
     theme: default
 ---
 
-This notebook generates QC plots from the guide RNA (gRNA) counts table ('quant.dir/all_samples.tsv').
+This notebook generates QC plots from the guide RNA (gRNA) counts table ('quant.dir/all_samples.tsv') and the read alignments to the gRNA sequences.
+
 To see the code, click the 'code' buttons, or set 'show all code' using the 'code' drop down in the top-right.
 
 ```{r Load libraries, message=FALSE, warning=FALSE}
@@ -83,7 +84,10 @@ n_guides <- length(readLines(file(here('guides.csv')), warn=FALSE))
 ```
 
 
-# Errors
+# Errors relative to expected gRNA sequences
+
+Using the alignments for reads to the gRNA sequences, we can extract the number of errors in the read sequence.
+
 ```{r plot error tallies, message=FALSE}
 max_errors <- setdiff(error_counts$errors, 'Unmapped') %>% as.numeric() %>% max()
 
@@ -171,7 +175,7 @@ ggsave(here('qc_plots.dir/gRNAs_per_gene.png'))
 # gRNA coverage (how many & at what depth) for each sample
 
 Grey-dashed horizontal line is the total number of gRNAs in the pool, inluding those not detected.
-```{r plot guides per sample, message=FALSE}
+```{r plot guides per sample, message=FALSE, warning=FALSE}
 
 guides_per_sample <- colSums((select(gRNA_counts, -c(gene, sgRNA)))>0) %>%
   data.frame() %>%
