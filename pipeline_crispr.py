@@ -268,6 +268,16 @@ def mergeTallies(infiles, outfile):
     all_samples_df.fillna(0).to_csv(outfile, sep='\t')
 
 
+@transform(mergeTallies,
+           suffix('.tsv'),
+           '_norm.tsv')
+def normaliseCounts(infile, outfile):
+
+    job_options = PARAMS['cluster_options'] + " -t 0:20:00"
+    job_condaenv=PARAMS['conda_base_env']
+
+    Crispy.normaliseCounts(infile, outfile, submit=True, job_options=job_options)
+
 ###################################################
 # Report
 ###################################################
@@ -413,7 +423,7 @@ else:
 
 # full_quant = run everything except the QC notebook
 @follows(mergeErrorCounts,
-         mergeTallies)
+         normaliseCounts)
 def full_quant():
     pass
 
