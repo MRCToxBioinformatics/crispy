@@ -402,17 +402,37 @@ if PARAMS['mageck_method'].lower() == 'rra':
 
         P.run(statement)
 
-else:
+
+if PARAMS['mageck_method'].lower() == mle:
     @mkdir('mageck.dir')
-    @transform('design_*.tsv',
-               regex('design_(\S+).tsv'),
+    @transform(P.asList(PARAMS['mageck_designs']),
+               regex('design_(\S+).txt'),
                add_inputs(mergeTallies),
-               r'mageck.dir/\1.gene_summary.txt')
+               r'mageck.dir/\1/\1.gene_summary.txt')
     def runMAGeCK(infiles, outfile):
         ''' run MAGeCK MLE to identify enriched/depleted '''
 
-        # Need to create this function!
-        pass
+        design_inf, counts = infiles
+        counts = os.path.abspath(counts)
+
+        outfile_base = P.snip(os.path.basename(outfile), '.gene_summary.txt')
+
+        job_threads = PARAMS['mageck_mle_threads']
+
+        statement = '''
+        cd mageck.dir/%(outfile_base)s;
+        mageck mle
+        --norm-method none
+        -k %(counts)s
+        -d %(design_inf)s
+        -n %(outfile_base)s
+        --threads %(job_threads)s 
+        ''' % locals()
+
+        P.run(statement)
+
+else:
+    raise ValueError('mageck_method must be "rra" or "mle"')
 
 
 
