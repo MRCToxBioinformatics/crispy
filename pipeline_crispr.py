@@ -429,6 +429,11 @@ if PARAMS['mageck_method'].lower() == mle:
         --threads %(job_threads)s 
         ''' % locals()
 
+        if PARAMS['cluster_queue_manager'] == "slurm":
+            job_options = PARAMS['cluster_options'] + " -t 2:00:00"
+        else:
+            job_options = PARAMS['cluster_options']
+
         P.run(statement)
 
 else:
