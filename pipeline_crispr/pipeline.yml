@@ -67,5 +67,8 @@ resample:
 mageck:
   # rra or mle
   method: 'rra'
+  # comma-separated list of design files with design_{identifier}.txt naming convention
+  # e.g designs: 'design_hs.txt,design_ctrl.txt'  
+  designs: 'design_hs.txt,design_ctrl.txt'  
   mle_threads: 30
   mle_options: '--permutation-round 10 --remove-outliers '
