@@ -27,13 +27,15 @@ See https://github.com/mamba-org/mamba for instructions on how to install mamba.
 Can alternatively only use conda to install the requirements, but mamba is quicker. Even with mamba,
 you may find the installation takes 10 minutes to complete
 
-Create a new conda environment and activate it, then install the required packages
+Create a new conda environment and activate it, then install the required packages.
+The R package poolr is not available via conda so must be installed via R.
 ```bash
 mamba create --name crispr-pipeline python=3.10   
 conda activate crispr-pipeline
 mamba install -c conda-forge -c bioconda \
 cgatcore fastqc bowtie multiqc samtools mageck pandoc \
-r-base r-here r-desctools r-pheatmap r-dplyr r-tidyr r-ggplot2 r bioconductor-deseq2 r-rmarkdown
+r-base r-here r-desctools r-pheatmap r-dplyr r-tidyr r-ggplot2 r bioconductor-deseq2 r-rmarkdown r-optparse
+R -e 'install.packages("poolr", repos="https://cran.ma.imperial.ac.uk/")'
 ```
 
 ------------
