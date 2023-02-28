@@ -367,7 +367,7 @@ if PARAMS['mageck_method'].lower() == 'rra':
     @transform('design_*.csv',
                regex('design_(\S+).csv'),
                add_inputs(mergeTallies),
-               r'mageck.dir/\1/\1.gene_summary.txt')
+               r'mageck.dir/\1.gene_summary.txt')
     def runMAGeCK(infiles, outfile):
         ''' run MAGeCK RRA to identify enriched/depleted '''
 
@@ -403,24 +403,25 @@ if PARAMS['mageck_method'].lower() == 'rra':
         P.run(statement)
 
 
-if PARAMS['mageck_method'].lower() == mle:
+if PARAMS['mageck_method'].lower() == 'mle':
     @mkdir('mageck.dir')
-    @transform(P.asList(PARAMS['mageck_designs']),
+    @transform(P.as_list(PARAMS['mageck_designs']),
                regex('design_(\S+).txt'),
                add_inputs(mergeTallies),
-               r'mageck.dir/\1/\1.gene_summary.txt')
+               r'mageck.dir/\1.gene_summary.txt')
     def runMAGeCK(infiles, outfile):
         ''' run MAGeCK MLE to identify enriched/depleted '''
 
         design_inf, counts = infiles
         counts = os.path.abspath(counts)
+        design_inf = os.path.abspath(design_inf)
 
         outfile_base = P.snip(os.path.basename(outfile), '.gene_summary.txt')
 
         job_threads = PARAMS['mageck_mle_threads']
 
         statement = '''
-        cd mageck.dir/%(outfile_base)s;
+        cd mageck.dir;
         mageck mle
         --norm-method none
         -k %(counts)s
