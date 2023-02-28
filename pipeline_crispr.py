@@ -368,7 +368,7 @@ if PARAMS['mageck_method'].lower() == 'rra':
                regex('design_(\S+).csv'),
                add_inputs(mergeTallies),
                r'mageck.dir/\1.gene_summary.txt')
-    def runMAGeCK(infiles, outfile):
+    def runMAGeCKrra(infiles, outfile):
         ''' run MAGeCK RRA to identify enriched/depleted '''
 
         design_inf, counts = infiles
@@ -402,6 +402,9 @@ if PARAMS['mageck_method'].lower() == 'rra':
 
         P.run(statement)
 
+    @follows(runMAGeCKrra)
+    def MAGeCK():
+        pass
 
 if PARAMS['mageck_method'].lower() == 'mle':
     @mkdir('mageck.dir')
@@ -409,7 +412,7 @@ if PARAMS['mageck_method'].lower() == 'mle':
                regex('design_(\S+).txt'),
                add_inputs(mergeTallies),
                r'mageck.dir/\1.gene_summary.txt')
-    def runMAGeCK(infiles, outfile):
+    def runMAGeCKmle(infiles, outfile):
         ''' run MAGeCK MLE to identify enriched/depleted '''
 
         design_inf, counts = infiles
@@ -437,6 +440,33 @@ if PARAMS['mageck_method'].lower() == 'mle':
 
         P.run(statement)
 
+    @merge(runMAGeckmle,
+        'mageck.dir/combined.gene_summary.txt')
+    def combineMAGeCK(infiles, outfile):
+        ''' Combine the results across the two runs of MAGECK MLE'''
+
+        control_infile, heat_shock_infile = infiles
+
+        this_filename = inspect.getframeinfo(inspect.currentframe()).filename
+        this_dir     = os.path.dirname(os.path.abspath(this_filename))
+
+        script_path = os.path.join(this_dir, 'R', 'mle_combine.R')
+
+        statement = '''
+        %(script_path)s
+        -s 0.05
+        -c %(control_infile)s
+        -h %(heat_shock_infile)s
+        -o %(outfile)s
+        '''
+
+        P.run(statement)
+
+
+    @follows(combineMAGeCK)
+    def MAGeCK():
+        pass
+
 else:
     raise ValueError('mageck_method must be "rra" or "mle"')
 
@@ -462,7 +492,7 @@ def qc():
     pass
 
 # full = run it all!
-@follows(runMAGeCK,
+@follows(MAGeCK,
          runCrispyQC)
 def full():
     pass
