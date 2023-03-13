@@ -34,7 +34,7 @@ mamba create --name crispr-pipeline python=3.10
 conda activate crispr-pipeline
 mamba install -c conda-forge -c bioconda \
 cgatcore fastqc bowtie multiqc samtools mageck pandoc \
-r-base r-here r-desctools r-pheatmap r-dplyr r-tidyr r-ggplot2 r bioconductor-deseq2 r-rmarkdown r-optparse
+r-base r-here r-desctools r-pheatmap r-dplyr r-tidyr r-ggplot2 bioconductor-deseq2 r-rmarkdown r-optparse
 R -e 'install.packages("poolr", repos="https://cran.ma.imperial.ac.uk/")'
 ```
 
