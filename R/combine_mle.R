@@ -28,14 +28,14 @@ suppressPackageStartupMessages(library("optparse"))
 # specify our desired options in a list
 # by default OptionParser will add an help option equivalent to 
 option_list <- list( 
-    make_option(c("-s", "--significance-threshold"), type='double', default=0.05,
+    make_option("--significance-threshold", type='double', default=0.05, dest='sig_threshold',
         help="Threshold for significant hit [default]"),
-    make_option(c("-c", "--ctrl-results"), type='character', dest='ctrl_results',
-        help="Filepath for control results [default]"),
-    make_option(c("-h", "--hs-results"), type='character', dest='hs_results',
-        help="Filepath for heat shock results [default]"))
-    make_option(c("-o", "--outfile"), type='character'
-        help="Filepath for combined results [default]"))
+    make_option("--ctrl-results", type='character', dest='ctrl_results',
+        help="Filepath for control results"),
+    make_option("--hs-results", type='character', dest='hs_results',
+        help="Filepath for heat shock results"),
+    make_option("--outfile", type='character',
+        help="Filepath for combined results"))
 
 opt <- parse_args(OptionParser(option_list=option_list))
 
