@@ -66,9 +66,12 @@ resample:
 
 mageck:
   # rra or mle
-  method: 'rra'
+  method: 'mle'
   # comma-separated list of design files with design_{identifier}.txt naming convention
+  # for pooled sorted design with mle, expect stress then ctrl designs
   # e.g designs: 'design_hs.txt,design_ctrl.txt'  
   designs: 'design_hs.txt,design_ctrl.txt'  
   mle_threads: 30
   mle_options: '--permutation-round 10 --remove-outliers'
+  # for pooled sorted design with mle, need to combine. Set to 0 otherwise
+  combine: 1

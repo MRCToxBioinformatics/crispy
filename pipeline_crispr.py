@@ -275,9 +275,9 @@ def mergeTallies(infiles, outfile):
 def normaliseCounts(infile, outfile):
 
     job_options = PARAMS['cluster_options'] + " -t 0:20:00"
-    job_condaenv=PARAMS['conda_base_env']
 
-    Crispy.normaliseCounts(infile, outfile, submit=True, job_options=job_options)
+    Crispy.normaliseCounts(infile, outfile, submit=True,
+                           job_options=job_options)
 
 ###################################################
 # Report
@@ -364,6 +364,7 @@ def runCrispyQC(outfile):
 ###################################################
 # statistical tests
 ###################################################
+# TS: consider dropping support for RRA if there is no use case..
 if PARAMS['mageck_method'].lower() == 'rra':
     @mkdir('mageck.dir')
     @transform('design_*.csv',
@@ -408,7 +409,7 @@ if PARAMS['mageck_method'].lower() == 'rra':
     def MAGeCK():
         pass
 
-if PARAMS['mageck_method'].lower() == 'mle':
+elif PARAMS['mageck_method'].lower() == 'mle':
     @mkdir('mageck.dir')
     @transform(P.as_list(PARAMS['mageck_designs']),
                regex('design_(\S+).txt'),
@@ -442,32 +443,39 @@ if PARAMS['mageck_method'].lower() == 'mle':
 
         P.run(statement)
 
-    @merge(runMAGeCKmle,
-        'mageck.dir/combined.gene_summary.txt')
-    def combineMAGeCK(infiles, outfile):
-        ''' Combine the results across the two runs of MAGECK MLE'''
 
-        control_infile, heat_shock_infile = infiles
+    if PARAMS['mageck_combine']:
+        @merge(runMAGeCKmle,
+            'mageck.dir/combined.gene_summary.txt')
+        def combineMAGeCK(infiles, outfile):
+            ''' Combine the results across the two runs of MAGECK MLE'''
 
-        this_filename = inspect.getframeinfo(inspect.currentframe()).filename
-        this_dir     = os.path.dirname(os.path.abspath(this_filename))
+            control_infile, heat_shock_infile = infiles
 
-        script_path = os.path.join(this_dir, 'R', 'combine_mle.R')
+            this_filename = inspect.getframeinfo(inspect.currentframe()).filename
+            this_dir     = os.path.dirname(os.path.abspath(this_filename))
 
-        statement = '''
-        %(script_path)s
-        --significance-threshold 0.05
-        --ctrl-results %(control_infile)s
-        --hs-results %(heat_shock_infile)s
-        --outfile %(outfile)s
-        '''
+            script_path = os.path.join(this_dir, 'R', 'combine_mle.R')
 
-        P.run(statement, job_condaenv=conda_base_env)
+            statement = '''
+            %(script_path)s
+            --significance-threshold 0.05
+            --ctrl-results %(control_infile)s
+            --hs-results %(heat_shock_infile)s
+            --outfile %(outfile)s
+            '''
+
+            P.run(statement, job_condaenv=conda_base_env)
 
 
-    @follows(combineMAGeCK)
-    def MAGeCK():
-        pass
+        @follows(combineMAGeCK)
+        def MAGeCK():
+            pass
+
+    else:
+        @follows(runMAGeCKmle)
+        def MAGeCK():
+            pass
 
 else:
     raise ValueError('mageck_method must be "rra" or "mle"')
