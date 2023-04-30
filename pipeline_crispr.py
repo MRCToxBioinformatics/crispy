@@ -326,7 +326,7 @@ def resampleTallies(infiles, outfile):
     ''' Resample the counts table to simulate different sequencing depths '''
     dummy_infile, infile = infiles
 
-    sample_frac = np.float(os.path.basename(dummy_infile))
+    sample_frac = float(os.path.basename(dummy_infile))
 
     job_options = PARAMS['cluster_options'] + " -t 0:20:00"
     job_condaenv=PARAMS['conda_base_env']
