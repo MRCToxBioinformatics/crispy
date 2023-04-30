@@ -82,6 +82,14 @@ error_counts$errors[is.na(error_counts$errors)] <- 'Unmapped'
 experimental_design <- read.delim(here('experimental_design.tsv'), sep='\t', row.names=NULL) %>%
   tibble::column_to_rownames('sample')
 
+if(identical(colnames(experimental_design), c('concentration'))){
+  crispr_type <- 'drug'
+} else if(identical(colnames(experimental_design), c('condition', 'sort'))){
+  crispr_type <- 'sorted'
+} else{
+  stop(paste('Columns in experimental_design.tsv must either be "condition" and "sort"',
+             '(pooled sorted screen) or "concentration" (drug viability screen)'))
+}
 
 n_guides <- length(readLines(file(here('guides.csv')), warn=FALSE))
 ```
@@ -95,7 +103,6 @@ Using the alignments for reads to the gRNA sequences, we can extract the number 
 max_errors <- setdiff(error_counts$errors, 'Unmapped') %>% as.numeric() %>% max()
 
 to_plot <- error_counts %>% pivot_longer(cols=-errors, names_to='sample', values_to='n') %>%
-  merge(experimental_design, by.x='sample', by.y='row.names') %>%
   mutate(errors=factor(errors, levels=c(0:max_errors, 'Unmapped'))) %>%
   group_by(sample) %>%
   mutate(perc=100*n/sum(n))
@@ -113,8 +120,8 @@ p <- to_plot %>%
   
 print(p)
 
-ggsave(here('qc_plots.dir/error_tallies.pdf'))
-ggsave(here('qc_plots.dir/error_tallies.png'))  
+ggsave(here('qc_plots.dir/error_tallies.pdf'), width=4, height=4)
+ggsave(here('qc_plots.dir/error_tallies.png'), width=4, height=4)  
 
 ```
 
@@ -138,8 +145,8 @@ p <- gRNA_counts_exp_only %>% apply(MARGIN=2, Gini) %>% data.frame() %>%
 
 print(p)
 
-ggsave(here('qc_plots.dir/gini_coefficients.pdf'))
-ggsave(here('qc_plots.dir/gini_coefficients.png'))
+ggsave(here('qc_plots.dir/gini_coefficients.pdf'), width=3, height=3)
+ggsave(here('qc_plots.dir/gini_coefficients.png'), width=3, height=3)
 ```
 
 
@@ -170,8 +177,8 @@ p <- n_gRNA_per_gene_tally %>%
 
 print(p)
 
-ggsave(here('qc_plots.dir/gRNAs_per_gene.pdf'))
-ggsave(here('qc_plots.dir/gRNAs_per_gene.png'))
+ggsave(here('qc_plots.dir/gRNAs_per_gene.pdf'), width=4, height=4)
+ggsave(here('qc_plots.dir/gRNAs_per_gene.png'), width=4, height=4)
 ```
 
 
@@ -183,8 +190,9 @@ Grey-dashed horizontal line is the total number of gRNAs in the pool, inluding t
 guides_per_sample <- colSums((select(gRNA_counts, -c(gene, sgRNA)))>0) %>%
   data.frame() %>%
   setNames('gRNAs') %>%
-  merge(experimental_design, by='row.names') %>%
-  rename('Row.names'='Sample')
+  tibble::rownames_to_column('Sample')
+  #merge(experimental_design, by='row.names') %>%
+  #rename('Row.names'='Sample')
   
 p <- guides_per_sample %>%
   ggplot(aes(factor(Sample), as.numeric(gRNAs))) +
@@ -197,26 +205,47 @@ p <- guides_per_sample %>%
   geom_hline(yintercept=n_guides, linetype=2, colour=get_my_colours(1), size=0.25) +
   ylab('Guides') 
 
-ggsave(here('qc_plots.dir/gRNAs_per_sample.pdf'))
-ggsave(here('qc_plots.dir/gRNAs_per_sample.png'))
+print(p)
+
+ggsave(here('qc_plots.dir/gRNAs_per_sample.pdf'), width=4, height=4)
+ggsave(here('qc_plots.dir/gRNAs_per_sample.png'), width=4, height=4)
 
 ```
 
 ```{r plot read depth per guide, message=FALSE}
-p <- gRNA_counts %>%
-  pivot_longer(cols=-c(gene, sgRNA)) %>%
-  merge(experimental_design, by.x='name', by.y='row.names') %>%
-  filter(!is.na(condition)) %>%
-  ggplot(aes(value, group=name, colour=sort, linetype=condition)) +
-  geom_density() +
-  scale_x_log10() +
-  my_theme(border=FALSE, base_size=15, base_family='sans') +
-  xlab('Reads') +
-  ylab('density') +
-  scale_colour_manual(values=get_my_colours(3)) +
-  ggtitle('Reads per gRNA')
-
-print(p)
+if(crispr_type=='sorted'){
+  p <- gRNA_counts %>%
+    pivot_longer(cols=-c(gene, sgRNA)) %>%
+    merge(experimental_design, by.x='name', by.y='row.names') %>%
+    filter(!is.na(condition)) %>%
+    ggplot(aes(value, group=name, colour=sort, linetype=condition)) +
+    geom_density() +
+    scale_x_log10() +
+    my_theme(border=FALSE, base_size=15, base_family='sans') +
+    xlab('Reads') +
+    ylab('density') +
+    scale_colour_manual(values=get_my_colours(3), name='Sort') +
+    ggtitle('Reads per gRNA')
+  
+  print(p)
+  
+} else if(crispr_type=='drug'){
+  p <- gRNA_counts %>%
+    pivot_longer(cols=-c(gene, sgRNA)) %>%
+    merge(experimental_design, by.x='name', by.y='row.names') %>%
+    filter(!is.na(concentration)) %>%
+    ggplot(aes(value, group=name, colour=factor(concentration))) +
+    geom_density() +
+    scale_x_log10() +
+    my_theme(border=FALSE, base_size=15, base_family='sans') +
+    xlab('Reads') +
+    ylab('density') +
+    scale_colour_manual(values=c('grey', get_my_colours(7)), name='Concentration') +
+    ggtitle('Reads per gRNA')
+  
+  print(p)
+  
+}
 
 ggsave(here('qc_plots.dir/gRNAs_per_sample.pdf'))
 ggsave(here('qc_plots.dir/gRNAs_per_sample.png'))
@@ -253,23 +282,48 @@ all_resampled_guides_per_sample <- lapply(resampled_quant, function(infile){
 
 Grey-dashed horizontal line is the total number of gRNAs in the pool, including those not detected.
 ```{r plot guides counts in resampled count tables, message=FALSE}
-p <- all_resampled_guides_per_sample %>%
-  mutate(reads_threshold=sprintf('>%s reads', reads_threshold)) %>%
-  merge(experimental_design, by.x='sample', by.y='row.names') %>%
-  ggplot(aes(as.numeric(depth), gRNAs, group=sample, colour=sort, linetype=condition)) +
-  geom_line() +
-  facet_grid(reads_threshold~.) +
-  my_theme(border=FALSE, base_family='sans', base_size=15) +
-  theme(strip.background=element_blank()) +
-  geom_vline(xintercept=1, linetype=2, colour='grey') +
-  geom_hline(yintercept=n_guides, linetype=2, colour='grey') +
-  xlab('Sequencing depth\n(relative to actual depth)')
+if(crispr_type=='sorted'){
 
-print(p)
+  p <- all_resampled_guides_per_sample %>%
+    mutate(reads_threshold=sprintf('>%s reads', reads_threshold)) %>%
+    merge(experimental_design, by.x='sample', by.y='row.names') %>%
+    ggplot(aes(as.numeric(depth), gRNAs, group=sample, colour=sort, linetype=condition)) +
+    geom_line() +
+    facet_grid(reads_threshold~.) +
+    my_theme(border=FALSE, base_family='sans', base_size=15) +
+    theme(strip.background=element_blank()) +
+    geom_vline(xintercept=1, linetype=2, colour='grey') +
+    geom_hline(yintercept=n_guides, linetype=2, colour='grey') +
+    scale_colour_manual(values=get_my_colours(7), name='Condition') +
+    xlab('Sequencing depth\n(relative to actual depth)')
+
+  print(p)
 
 
-ggsave(here('qc_plots.dir/sequencing_depth.pdf'))
-ggsave(here('qc_plots.dir/sequencing_depth.png'))
+} else if(crispr_type=='drug'){
+
+  p <- all_resampled_guides_per_sample %>%
+    mutate(reads_threshold=sprintf('>%s reads', reads_threshold)) %>%
+    merge(experimental_design, by.x='sample', by.y='row.names') %>%
+    ggplot(aes(as.numeric(depth), gRNAs, group=sample, colour=factor(concentration))) +
+    geom_line() +
+    facet_grid(reads_threshold~.) +
+    my_theme(border=FALSE, base_family='sans', base_size=15) +
+    theme(strip.background=element_blank()) +
+    geom_vline(xintercept=1, linetype=2, colour='grey') +
+    geom_hline(yintercept=n_guides, linetype=2, colour='grey') +
+    scale_colour_manual(values=c('grey', get_my_colours(7)), name='Concentration') +
+    xlab('Sequencing depth\n(relative to actual depth)')
+
+  print(p)
+
+  
+}
+
+
+
+ggsave(here('qc_plots.dir/sequencing_depth.pdf'), width=5, height=7)
+ggsave(here('qc_plots.dir/sequencing_depth.png'), width=5, height=7)
 ```
 
 
@@ -282,37 +336,66 @@ cts <- gRNA_counts_exp_only[rowSums(gRNA_counts_exp_only)>0,]
 
 Visualising the correlations between samples can be useful to identify outlier samples and, where there are replicate experiments, check that they have simiar guide RNA counts.
 
-```{r plot correlation matrix, fig.height=7, fig.width=7, message=FALSE}
+```{r plot correlation matrix, fig.height=5, fig.width=5, message=FALSE}
 
 mat <- cor(cts)
 pheatmap(mat, cellwidth=10, cellheight=10)
-pheatmap(mat, cellwidth=10, cellheight=10, filename=here('qc_plots.dir/correlations.pdf'))
-pheatmap(mat, cellwidth=10, cellheight=10, filename=here('qc_plots.dir/correlations.png'))
+pheatmap(mat, cellwidth=10, cellheight=10, filename=here('qc_plots.dir/correlations.pdf'), width=4, height=4)
+pheatmap(mat, cellwidth=10, cellheight=10, filename=here('qc_plots.dir/correlations.png'), width=4, height=4)
 ```
 # PCA
 
 Principle Component Analysis is useful to identify the major sources of variance. We expect the major sources of variance to align with experimental conditions. 
 
 ```{r plot PCA projections, message=FALSE}
+if(crispr_type=='sorted'){
+  
+  experimental_design_complete <- experimental_design[experimental_design$sort!='Unsorted',]
+  
+  dds <- DESeqDataSetFromMatrix(countData = cts[,rownames(experimental_design_complete)],
+                                colData = experimental_design_complete,
+                                design = as.formula(sprintf('~ %s', paste(colnames(experimental_design_complete), collapse='+'))))
+  
+  vst <- vst(dds, blind=FALSE)
+  
+  p <- DESeq2::plotPCA(vst, intgroup=colnames(experimental_design_complete), ntop=nrow(vst)) +
+    my_theme(border=FALSE, base_family='sans') +
+    aes(fill=condition, shape=sort, colour=condition) +
+    geom_point(colour='grey30', size=5) +
+    scale_fill_manual(values=get_my_colours(2)) +
+    scale_shape_manual(values=21:25) +
+    scale_colour_discrete(guide="none")
+    guides(fill = guide_legend(override.aes = list(pch=21) ) )
+  
+  print(p)
 
-experimental_design_complete <- experimental_design[experimental_design$sort!='Unsorted',]
 
-dds <- DESeqDataSetFromMatrix(countData = cts[,rownames(experimental_design_complete)],
-                              colData = experimental_design_complete,
-                              design = as.formula(sprintf('~ %s', paste(colnames(experimental_design_complete), collapse='+'))))
+} else if(crispr_type=='drug'){
 
-vst <- vst(dds, blind=FALSE)
+  experimental_design_complete <- experimental_design
+  
+  dds <- DESeqDataSetFromMatrix(countData = cts[,rownames(experimental_design_complete)],
+                                colData = experimental_design_complete,
+                                design = as.formula(sprintf('~ %s', paste(colnames(experimental_design_complete), collapse='+'))))
+  
+  vst <- vst(dds, blind=FALSE)
+  
+  p <- DESeq2::plotPCA(vst, intgroup=colnames(experimental_design_complete), ntop=nrow(vst)) +
+    my_theme(border=FALSE, base_family='sans') +
+    aes(fill=factor(concentration), colour=factor(concentration)) +
+    geom_point(colour='grey30', pch=21, size=5) +
+    scale_shape_manual(values=21:25) +
+    scale_fill_manual(values=c('grey', get_my_colours(7)), name='Concentration') +
+    scale_colour_manual(values=c('grey', get_my_colours(7)), guide='none') +
+    guides(fill = guide_legend(override.aes = list(pch=21) ) )
+  
+  print(p)
 
-p <- DESeq2::plotPCA(vst, intgroup=colnames(experimental_design_complete), ntop=nrow(vst)) +
-  my_theme(border=FALSE, base_family='sans') +
-  aes(fill=condition, shape=sort, colour=condition) +
-  geom_point(colour='grey30', size=3) +
-  scale_fill_manual(values=get_my_colours(2)) +
-  scale_shape_manual(values=21:25) +
-  scale_colour_discrete(guide="none") +
-  guides(fill = guide_legend(override.aes = list(pch=21) ) )
+  
+}
 
-print(p)
+
+
 
 ggsave(here('qc_plots.dir/pca.png'))
 ggsave(here('qc_plots.dir/pca.pdf'))
