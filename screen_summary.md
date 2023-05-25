@@ -49,11 +49,13 @@ NELFE_HS_HIGH2_R1_001.fastq.gz
 NELFE_HS_LOW1_R1_001.fastq.gz
 
 ** UBIK48 - **
-Samples froom GW3
+Replicate 1 samples and unsorted libraries 1 & 2 are from GW3. The rest are from GW4. Clear batch
+effect across the sequencing runs	
 
 MOLM13_LIB1_R1_001.fastq.gz
 MOLM13_LIB2_R1_001.fastq.gz
 MOLM13_LIB3_R1_001.fastq.gz
+MOLM13_LIB4_R1_001.fastq.gz
 UBIK48_CTR_HIGH1_R1_001.fastq.gz
 UBIK48_CTR_HIGH2_R1_001.fastq.gz
 UBIK48_CTR_LOW1_R1_001.fastq.gz
@@ -62,3 +64,25 @@ UBIK48_HS_HIGH1_R1_001.fastq.gz
 UBIK48_HS_HIGH2_R1_001.fastq.gz
 UBIK48_HS_LOW1_R1_001.fastq.gz
 UBIK48_HS_LOW2_R1_001.fastq.gz
+
+**SITA - MOLM13**
+No replicates, except for MOLM13 unsorted
+Two sequencing runs:
+
+Run 1 - Low/no reads in 3/4 SITA sorted samples
+Run 2 (GW5) - SITA_CTR_LOW2 has very high Gini coefficient and all 4 samples look undersampled.
+
+
+**HSP90 - MOLM13**	
+
+Sequenced twice:
+First time (GW3) there were low/no reads from ¾ sorted samples, but correlations surprisingly good for all but one sample
+Second time (GW5; using unsorted MOLM13 samples from GW3):
+The Gini coefficient is very high for HS_LOW2 and correlations are poor
+Samples are still under sequenced
+
+
+**SITA - HAP1**
+
+
+**HSP90 - HAP1**
