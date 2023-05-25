@@ -94,7 +94,7 @@ def runFastQC(infile, outfile):
     statement = '''
     fastqc
     -o %(outdir)s
-    -d %(tmpdir)s
+    --dir %(tmpdir)s
     %(infile)s
     >& %(outfile)s''' % locals()
 
@@ -151,7 +151,7 @@ def runBowtie(infiles, outfile, index):
     name_base = iotools.snip(index, '.1.ebwt')
 
     # P.run uses local variables including threads for job submission
-    threads = PARAMS['bowtie_threads']
+    job_threads = PARAMS['bowtie_threads']
 
     bowtie_options = PARAMS['bowtie_options']
 
@@ -162,7 +162,7 @@ def runBowtie(infiles, outfile, index):
     bowtie
     -x %(name_base)s
     %(bowtie_options)s
-    -p %(threads)s
+    -p %(job_threads)s
     -S
     %(infiles)s
     > %(tmp_file)s 2> %(outfile)s.stderr;
@@ -275,9 +275,9 @@ def mergeTallies(infiles, outfile):
 def normaliseCounts(infile, outfile):
 
     job_options = PARAMS['cluster_options'] + " -t 0:20:00"
-    job_condaenv=PARAMS['conda_base_env']
 
-    Crispy.normaliseCounts(infile, outfile, submit=True, job_options=job_options)
+    Crispy.normaliseCounts(infile, outfile, submit=True,
+                           job_options=job_options)
 
 ###################################################
 # Report
@@ -326,7 +326,7 @@ def resampleTallies(infiles, outfile):
     ''' Resample the counts table to simulate different sequencing depths '''
     dummy_infile, infile = infiles
 
-    sample_frac = np.float(os.path.basename(dummy_infile))
+    sample_frac = float(os.path.basename(dummy_infile))
 
     job_options = PARAMS['cluster_options'] + " -t 0:20:00"
     job_condaenv=PARAMS['conda_base_env']
@@ -356,12 +356,15 @@ def runCrispyQC(outfile):
     Rscript -e "rmarkdown::render('QC_plotting.Rmd')"
     ''' % locals()
 
+    job_condaenv = PARAMS['conda_base_env']
+
     P.run(statement)
 
 
 ###################################################
 # statistical tests
 ###################################################
+# TS: consider dropping support for RRA if there is no use case..
 if PARAMS['mageck_method'].lower() == 'rra':
     @mkdir('mageck.dir')
     @transform('design_*.csv',
@@ -406,11 +409,11 @@ if PARAMS['mageck_method'].lower() == 'rra':
     def MAGeCK():
         pass
 
-if PARAMS['mageck_method'].lower() == 'mle':
+elif PARAMS['mageck_method'].lower() == 'mle':
     @mkdir('mageck.dir')
     @transform(P.as_list(PARAMS['mageck_designs']),
                regex('design_(\S+).txt'),
-               add_inputs(mergeTallies),
+               add_inputs(normaliseCounts),
                r'mageck.dir/\1.gene_summary.txt')
     def runMAGeCKmle(infiles, outfile):
         ''' run MAGeCK MLE to identify enriched/depleted '''
@@ -434,38 +437,45 @@ if PARAMS['mageck_method'].lower() == 'mle':
         ''' % locals()
 
         if PARAMS['cluster_queue_manager'] == "slurm":
-            job_options = PARAMS['cluster_options'] + " -t 2:00:00"
+            job_options = PARAMS['cluster_options'] + " -t 4:00:00"
         else:
             job_options = PARAMS['cluster_options']
 
         P.run(statement)
 
-    @merge(runMAGeckmle,
-        'mageck.dir/combined.gene_summary.txt')
-    def combineMAGeCK(infiles, outfile):
-        ''' Combine the results across the two runs of MAGECK MLE'''
 
-        control_infile, heat_shock_infile = infiles
+    if PARAMS['mageck_combine']:
+        @merge(runMAGeCKmle,
+            'mageck.dir/combined.gene_summary.txt')
+        def combineMAGeCK(infiles, outfile):
+            ''' Combine the results across the two runs of MAGECK MLE'''
 
-        this_filename = inspect.getframeinfo(inspect.currentframe()).filename
-        this_dir     = os.path.dirname(os.path.abspath(this_filename))
+            control_infile, heat_shock_infile = infiles
 
-        script_path = os.path.join(this_dir, 'R', 'mle_combine.R')
+            this_filename = inspect.getframeinfo(inspect.currentframe()).filename
+            this_dir     = os.path.dirname(os.path.abspath(this_filename))
 
-        statement = '''
-        %(script_path)s
-        -s 0.05
-        -c %(control_infile)s
-        -h %(heat_shock_infile)s
-        -o %(outfile)s
-        '''
+            script_path = os.path.join(this_dir, 'R', 'combine_mle.R')
 
-        P.run(statement)
+            statement = '''
+            %(script_path)s
+            --significance-threshold 0.05
+            --ctrl-results %(control_infile)s
+            --hs-results %(heat_shock_infile)s
+            --outfile %(outfile)s
+            '''
+
+            P.run(statement, job_condaenv=conda_base_env)
 
 
-    @follows(combineMAGeCK)
-    def MAGeCK():
-        pass
+        @follows(combineMAGeCK)
+        def MAGeCK():
+            pass
+
+    else:
+        @follows(runMAGeCKmle)
+        def MAGeCK():
+            pass
 
 else:
     raise ValueError('mageck_method must be "rra" or "mle"')
@@ -493,7 +503,7 @@ def qc():
 
 # full = run it all!
 @follows(MAGeCK,
-         runCrispyQC)
+         qc)
 def full():
     pass
 
