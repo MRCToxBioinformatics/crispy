@@ -203,7 +203,7 @@ def countErrors(infile, outfile):
     %(outfile)s
     ''' % locals()
 
-    P.run(statement)
+    P.run(statement, job_condaenv=conda_base_env)
 
 @merge(countErrors,
        'bowtie.dir/all_errors.tsv')
@@ -426,6 +426,8 @@ elif PARAMS['mageck_method'].lower() == 'mle':
 
         job_threads = PARAMS['mageck_mle_threads']
 
+        mageck_mle_options = PARAMS['mageck_mle_options']
+
         statement = '''
         cd mageck.dir;
         mageck mle
@@ -433,6 +435,7 @@ elif PARAMS['mageck_method'].lower() == 'mle':
         -k %(counts)s
         -d %(design_inf)s
         -n %(outfile_base)s
+        %(mageck_mle_options)s
         --threads %(job_threads)s 
         ''' % locals()
 
