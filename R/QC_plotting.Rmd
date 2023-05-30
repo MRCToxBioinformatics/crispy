@@ -84,11 +84,13 @@ experimental_design <- read.delim(here('experimental_design.tsv'), sep='\t', row
 
 if(identical(colnames(experimental_design), c('concentration'))){
   crispr_type <- 'drug'
-} else if(identical(colnames(experimental_design), c('condition', 'sort'))){
+} else if(length(setdiff(colnames(experimental_design), c('condition', 'sort')))==0){
   crispr_type <- 'sorted'
 } else{
-  stop(paste('Columns in experimental_design.tsv must either be "condition" and "sort"',
-             '(pooled sorted screen) or "concentration" (drug viability screen)'))
+  crispr_type <- 'other'
+  warning(paste('Columns in experimental_design.tsv must either be "condition" and "sort"',
+                '(pooled sorted screen) or "concentration" (drug viability screen).',
+                'Falling back on using the first two columns in experimental_design.tsv as the plotting aesthetics'))
 }
 
 n_guides <- length(readLines(file(here('guides.csv')), warn=FALSE))
@@ -218,13 +220,14 @@ if(crispr_type=='sorted'){
     pivot_longer(cols=-c(gene, sgRNA)) %>%
     merge(experimental_design, by.x='name', by.y='row.names') %>%
     filter(!is.na(condition)) %>%
-    ggplot(aes(value, group=name, colour=sort, linetype=condition)) +
+    ggplot(aes(value, group=name, colour=factor(condition), linetype=factor(sort))) +
     geom_density() +
     scale_x_log10() +
     my_theme(border=FALSE, base_size=15, base_family='sans') +
     xlab('Reads') +
     ylab('density') +
-    scale_colour_manual(values=get_my_colours(3), name='Sort') +
+    scale_colour_manual(values=get_my_colours(7), name='Condition') +
+    scale_linetype_discrete(name='Sort') +
     ggtitle('Reads per gRNA')
   
   print(p)
@@ -245,6 +248,28 @@ if(crispr_type=='sorted'){
   
   print(p)
   
+} else if(crispr_type=='other'){
+  colour_col = colnames(experimental_design)[1]
+  p <- gRNA_counts %>%
+    pivot_longer(cols=-c(gene, sgRNA)) %>%
+    merge(experimental_design, by.x='name', by.y='row.names') %>%
+    filter(!is.na(!!sym(colour_col))) %>%
+    ggplot(aes(value, group=name, colour=factor(!!sym(colour_col)))) +
+    geom_density() +
+    scale_x_log10() +
+    my_theme(border=FALSE, base_size=15, base_family='sans') +
+    xlab('Reads') +
+    ylab('density') +
+    scale_colour_manual(values=c('grey', get_my_colours(7)), name=colour_col) +
+    ggtitle('Reads per gRNA')
+  
+  if(ncol(experimental_design)>1){
+    linetype_col = colnames(experimental_design)[2]
+    p <- p + aes(linetype=factor(!!sym(linetype_col))) +
+      scale_linetype_discrete(name=linetype_col)
+  }
+  
+  print(p)
 }
 
 ggsave(here('qc_plots.dir/gRNAs_per_sample.pdf'))
@@ -256,7 +281,7 @@ ggsave(here('qc_plots.dir/gRNAs_per_sample.png'))
 
 By re-sampling from the counts table at different depths, we can simulate the impact of lower or higher sequencing depth and see how this would affect the number of gRNAs detecting at different reads thresholds. 
 ```{r count guides in resampled count tables, message=FALSE}
-resampled_quant <- Sys.glob(here('resampled_quant.dir/*all_samples.tsv'))
+  resampled_quant <- Sys.glob(here('resampled_quant.dir/*all_samples.tsv'))
 
 all_resampled_guides_per_sample <- lapply(resampled_quant, function(infile){
   depth <- strsplit(basename(infile), '_',)[[1]][[1]]
@@ -287,7 +312,7 @@ if(crispr_type=='sorted'){
   p <- all_resampled_guides_per_sample %>%
     mutate(reads_threshold=sprintf('>%s reads', reads_threshold)) %>%
     merge(experimental_design, by.x='sample', by.y='row.names') %>%
-    ggplot(aes(as.numeric(depth), gRNAs, group=sample, colour=sort, linetype=condition)) +
+    ggplot(aes(as.numeric(depth), gRNAs, group=sample, colour=factor(condition), linetype=factor(sort))) +
     geom_line() +
     facet_grid(reads_threshold~.) +
     my_theme(border=FALSE, base_family='sans', base_size=15) +
@@ -295,9 +320,8 @@ if(crispr_type=='sorted'){
     geom_vline(xintercept=1, linetype=2, colour='grey') +
     geom_hline(yintercept=n_guides, linetype=2, colour='grey') +
     scale_colour_manual(values=get_my_colours(7), name='Condition') +
+    scale_linetype_discrete(name='Sort') +
     xlab('Sequencing depth\n(relative to actual depth)')
-
-  print(p)
 
 
 } else if(crispr_type=='drug'){
@@ -315,12 +339,33 @@ if(crispr_type=='sorted'){
     scale_colour_manual(values=c('grey', get_my_colours(7)), name='Concentration') +
     xlab('Sequencing depth\n(relative to actual depth)')
 
-  print(p)
+} else if(crispr_type=='other'){
+  
+  colour_col = colnames(experimental_design)[1]
+    
+  p <- all_resampled_guides_per_sample %>%
+    mutate(reads_threshold=sprintf('>%s reads', reads_threshold)) %>%
+    merge(experimental_design, by.x='sample', by.y='row.names') %>%
+    ggplot(aes(as.numeric(depth), gRNAs, group=sample, colour=factor(!!sym(colour_col)))) +
+    geom_line() +
+    facet_grid(reads_threshold~.) +
+    my_theme(border=FALSE, base_family='sans', base_size=15) +
+    theme(strip.background=element_blank()) +
+    geom_vline(xintercept=1, linetype=2, colour='grey') +
+    geom_hline(yintercept=n_guides, linetype=2, colour='grey') +
+    scale_colour_manual(values=c('grey', get_my_colours(7)), name=colour_col) +
+    xlab('Sequencing depth\n(relative to actual depth)')
 
+
+  if(ncol(experimental_design)>1){
+    linetype_col = colnames(experimental_design)[2]
+    p <- p + aes(linetype=factor(!!sym(linetype_col))) +
+      scale_linetype_discrete(name=linetype_col)
+  } 
   
 }
 
-
+print(p)
 
 ggsave(here('qc_plots.dir/sequencing_depth.pdf'), width=5, height=7)
 ggsave(here('qc_plots.dir/sequencing_depth.png'), width=5, height=7)
@@ -360,27 +405,24 @@ if(crispr_type=='sorted'){
   
   p <- DESeq2::plotPCA(vst, intgroup=colnames(experimental_design_complete), ntop=nrow(vst)) +
     my_theme(border=FALSE, base_family='sans') +
-    aes(fill=condition, shape=sort, colour=condition) +
-    geom_point(colour='grey30', size=5) +
-    scale_fill_manual(values=get_my_colours(2)) +
-    scale_shape_manual(values=21:25) +
-    scale_colour_discrete(guide="none")
+    aes(shape=factor(sort), fill=factor(condition), colour=factor(condition)) +
+    geom_point(size=5) +
+    scale_fill_manual(values=get_my_colours(7), name='Condition') +
+    scale_colour_manual(values=get_my_colours(7), name='Condition') +
+    scale_shape_discrete(name='Sort') +
     guides(fill = guide_legend(override.aes = list(pch=21) ) )
   
-  print(p)
-
 
 } else if(crispr_type=='drug'){
 
-  experimental_design_complete <- experimental_design
-  
-  dds <- DESeqDataSetFromMatrix(countData = cts[,rownames(experimental_design_complete)],
-                                colData = experimental_design_complete,
-                                design = as.formula(sprintf('~ %s', paste(colnames(experimental_design_complete), collapse='+'))))
+
+  dds <- DESeqDataSetFromMatrix(countData = cts[,rownames(experimental_design)],
+                                colData = experimental_design,
+                                design = as.formula(sprintf('~ %s', paste(colnames(experimental_design), collapse='+'))))
   
   vst <- vst(dds, blind=FALSE)
   
-  p <- DESeq2::plotPCA(vst, intgroup=colnames(experimental_design_complete), ntop=nrow(vst)) +
+  p <- DESeq2::plotPCA(vst, intgroup=colnames(experimental_design), ntop=nrow(vst)) +
     my_theme(border=FALSE, base_family='sans') +
     aes(fill=factor(concentration), colour=factor(concentration)) +
     geom_point(colour='grey30', pch=21, size=5) +
@@ -389,13 +431,36 @@ if(crispr_type=='sorted'){
     scale_colour_manual(values=c('grey', get_my_colours(7)), guide='none') +
     guides(fill = guide_legend(override.aes = list(pch=21) ) )
   
-  print(p)
+  
 
+  
+} else if(crispr_type=='other'){
+  
+  condition1 = colnames(experimental_design)[1]
+  
+  if(ncol(experimental_design)>1){
+    condition2 = colnames(experimental_design)[2]  
+    
+    dds <- DESeqDataSetFromMatrix(countData = cts[,rownames(experimental_design)],
+                                colData = experimental_design,
+                                design = as.formula(sprintf('~ %s', paste(c(condition1, condition2), collapse='+'))))
+  
+    vst <- vst(dds, blind=FALSE)
+  
+    p <- DESeq2::plotPCA(vst, intgroup=colnames(experimental_design), ntop=nrow(vst)) +
+      my_theme(border=FALSE, base_family='sans') +
+      aes(fill=factor(!!sym(condition1)), colour=factor(!!sym(condition1)), shape=factor(!!sym(condition2))) +
+    geom_point(size=5) +
+    scale_fill_manual(values=c('grey', get_my_colours(7)), name=condition1) +
+    scale_shape_discrete(name=condition2) +
+    scale_colour_manual(values=c('grey', get_my_colours(7)), guide=FALSE) +
+    guides(fill = guide_legend(override.aes = list(pch=21) ) )
+  }
+  
   
 }
 
-
-
+print(p)
 
 ggsave(here('qc_plots.dir/pca.png'))
 ggsave(here('qc_plots.dir/pca.pdf'))
