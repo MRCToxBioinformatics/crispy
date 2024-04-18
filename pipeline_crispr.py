@@ -440,7 +440,7 @@ elif PARAMS['mageck_method'].lower() == 'mle':
         ''' % locals()
 
         if PARAMS['cluster_queue_manager'] == "slurm":
-            job_options = PARAMS['cluster_options'] + " -t 4:00:00"
+            job_options = PARAMS['cluster_options'] + " -t 12:00:00"
         else:
             job_options = PARAMS['cluster_options']
 
@@ -453,7 +453,8 @@ elif PARAMS['mageck_method'].lower() == 'mle':
         def combineMAGeCK(infiles, outfile):
             ''' Combine the results across the two runs of MAGECK MLE'''
 
-            control_infile, heat_shock_infile = infiles
+            # if there are more than two files, don't combine them!
+            control_infile, heat_shock_infile = infiles[0:2]
 
             this_filename = inspect.getframeinfo(inspect.currentframe()).filename
             this_dir     = os.path.dirname(os.path.abspath(this_filename))
