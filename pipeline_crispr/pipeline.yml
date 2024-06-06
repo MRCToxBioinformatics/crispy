@@ -64,6 +64,10 @@ resample:
   max: 3
   step: 0.05
 
+# A comma separated list of 'gene' names for non-targetting genes
+# e.g 'NT' or 'NT,Control,Non-target' if there are multiple names
+NT_genes:
+
 mageck:
   # rra or mle
   method: 'mle'

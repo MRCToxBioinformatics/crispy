@@ -39,8 +39,6 @@ import sys
 import os
 import inspect
 
-
-# import re
 # import shutil
 # import sqlite3
 # import glob
@@ -109,7 +107,9 @@ def runFastQC(infile, outfile):
 @originate('reference.dir/guides.fasta')
 def makeGuidesFasta(outfile):
     with open(outfile, 'w') as outf:
+
         with open(PARAMS['reference_guides'], 'r') as inf:
+            header = inf.readline()
             for line in inf:
                 name, gene, sequence = line.strip().split(',')
                 outf.write('>%s\n' % name)
@@ -276,7 +276,13 @@ def normaliseCounts(infile, outfile):
 
     job_options = PARAMS['cluster_options'] + " -t 0:20:00"
 
-    Crispy.normaliseCounts(infile, outfile, submit=True,
+    if PARAMS['NT_genes']:
+        nt_genes = P.as_list(PARAMS['NT_genes'])
+    else:
+        nt_genes = None
+
+    Crispy.normaliseCounts(infile, outfile, nt_genes,
+                           submit=True,
                            job_options=job_options)
 
 ###################################################

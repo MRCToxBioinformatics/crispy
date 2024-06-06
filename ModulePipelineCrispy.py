@@ -1,6 +1,7 @@
 from cgatcore import pipeline as P
 import cgatcore.iotools as iotools
 import os
+import re
 import math
 from cgatcore.pipeline import cluster_runnable
 
@@ -53,7 +54,7 @@ def resampleTallies(infile, sample_frac, outfile):
 
 
 @cluster_runnable
-def normaliseCounts(prenorm_table_filepath, norm_table_filepath):
+def normaliseCounts(prenorm_table_filepath, norm_table_filepath, NT_genes = None):
 
     # mageckcount_getmediannormfactor is unmodified copy from
     # https://bitbucket.org/liulab/mageck/src/5a8503bbd864c9785f3d139e4d6317404b986cdd/mageck/mageckCountNorm.py#lines-15:28
@@ -84,6 +85,8 @@ def normaliseCounts(prenorm_table_filepath, norm_table_filepath):
     # TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
     # USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
     # DAMAGE.
+
+    # NT_genes (optional): List of non-targetting genes to use for normalisation
 
     def mageckcount_getmediannormfactor(ctable):
       """
@@ -122,7 +125,13 @@ def normaliseCounts(prenorm_table_filepath, norm_table_filepath):
 
     
 
-    medianfactor = mageckcount_getmediannormfactor(ctable)
+    if NT_genes is not None:    
+        NT_genes_group = '(%s)' % "|".join(NT_genes)
+        pattern = re.compile('%s_\d+---%s' % (NT_genes_group, NT_genes_group))
+        ctable_nt = {x:y for x,y in ctable.items() if re.search(pattern, x)}
+        medianfactor = mageckcount_getmediannormfactor(ctable_nt)
+    else:
+        medianfactor = mageckcount_getmediannormfactor(ctable)
 
     samplefactor = medianfactor
     n=len(ctable[list(ctable.keys())[0]]) # samples
